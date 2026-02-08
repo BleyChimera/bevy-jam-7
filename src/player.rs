@@ -1,4 +1,6 @@
+use crate::character_body::CharacterBody;
 use crate::input::PlayerInput;
+
 use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
@@ -11,13 +13,22 @@ impl Plugin for PlayerPlugin {
             .register_type::<CameraPivot>();
 
         app.add_systems(Update, move_camera);
+
+        app.add_systems(
+            FixedUpdate,
+            (player_movement, player_gravity).after(PhysicsSystems::Last),
+        );
     }
 }
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
-#[require(crate::character_body::CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, Collider::capsule(0.2,0.8), PlayerMarker)]
+#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
+
+#[derive(Component, Reflect, Clone, Copy, Default)]
+#[reflect(Component)]
+pub struct PlayerLookDirection(pub Vec3);
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
 #[reflect(Component)]
@@ -29,11 +40,11 @@ pub struct CameraPivot;
 
 fn move_camera(
     query: Query<(&mut Transform, &ChildOf), With<CameraPivot>>,
-    players: Query<&ActionState<PlayerInput>>,
+    players: Query<(&mut PlayerLookDirection, &ActionState<PlayerInput>)>,
     time: Res<Time>,
 ) {
     for (mut transform, child_of) in query {
-        let input = players.get(child_of.0).unwrap();
+        let (mut direction, input) = players.get(child_of.0).unwrap();
 
         let camera_movement = input.axis_pair(&PlayerInput::Camera) * time.delta_secs();
 
@@ -51,3 +62,14 @@ fn move_camera(
         transform.rotate_y(camera_movement.x);
     }
 }
+
+fn player_movement(
+    players: Query<(
+        &mut LinearVelocity,
+        &ActionState<PlayerInput>,
+        &CharacterBody,
+    )>,
+) {
+}
+
+fn player_gravity() {}
