@@ -60,6 +60,10 @@ fn move_camera(
 
         transform.rotate_local_x(diff);
         transform.rotate_y(camera_movement.x);
+        
+        bevy::app::hotpatch::call(|| {
+            
+        })
     }
 }
 
@@ -69,7 +73,33 @@ fn player_movement(
         &ActionState<PlayerInput>,
         &CharacterBody,
     )>,
+    time: Res<Time>,
 ) {
+    for (mut velocity, input, body) in players {
+        bevy::app::hotpatch::call(|| {
+            if body.grounded {
+                let target_velocity = input.axis_pair(&PlayerInput::Move);
+            }
+            else {
+                println!("You really need a state machine or a component that determines movement stats on several states");
+            }
+        })
+    }
 }
 
-fn player_gravity() {}
+fn player_gravity(players: Query<(&mut LinearVelocity, &CharacterBody)>, time: Res<Time>) {
+    for (mut velocity, body) in players {
+        bevy::app::hotpatch::call(|| {
+            if body.grounded {
+                velocity.y = 0.0;
+            } else {
+                if velocity.y > 0.0 {
+                    velocity.y -= time.delta_secs() * 10.0;
+                }
+                else {
+                    velocity.y -= time.delta_secs() * 15.0;
+                }
+            }
+        })
+    }
+}

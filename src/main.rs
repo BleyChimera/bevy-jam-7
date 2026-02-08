@@ -36,6 +36,7 @@ fn test_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         player::PlayerCharacterMarker,
         input::PlayerInput::default_input_map(),
+        Transform::from_xyz(0.0, 0.5, 0.0),
         children![(
             player::CameraPivot,
             Transform::from_xyz(0.0, 1.0, 0.0),
