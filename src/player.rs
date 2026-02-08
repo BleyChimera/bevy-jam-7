@@ -40,11 +40,11 @@ pub struct CameraPivot;
 
 fn move_camera(
     query: Query<(&mut Transform, &ChildOf), With<CameraPivot>>,
-    players: Query<(&mut PlayerLookDirection, &ActionState<PlayerInput>)>,
+    mut players: Query<(&mut PlayerLookDirection, &ActionState<PlayerInput>)>,
     time: Res<Time>,
 ) {
     for (mut transform, child_of) in query {
-        let (mut direction, input) = players.get(child_of.0).unwrap();
+        let (mut direction, input) = players.get_mut(child_of.0).unwrap();
 
         let camera_movement = input.axis_pair(&PlayerInput::Camera) * time.delta_secs();
 
@@ -62,7 +62,7 @@ fn move_camera(
         transform.rotate_y(camera_movement.x);
         
         bevy::app::hotpatch::call(|| {
-            
+            direction.0 = transform.rotation * Vec3::Z;
         })
     }
 }
