@@ -1,6 +1,11 @@
 use bevy::prelude::*;
 
 pub(super) struct StateMachinePlugin;
+impl Plugin for StateMachinePlugin {
+    fn build(&self, app: &mut App) {
+        app.register_type::<StateMachine>();
+    }
+}
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
 #[reflect(Component)]

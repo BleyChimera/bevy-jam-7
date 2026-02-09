@@ -16,6 +16,8 @@ impl Plugin for PlayerPlugin {
             .register_type::<PlayerMarker>()
             .register_type::<CameraPivot>();
 
+        app.add_plugins(state_machine::StateMachinePlugin);
+
         app.add_systems(Update, move_camera);
 
         app.add_systems(
@@ -80,7 +82,7 @@ fn player_movement(
 ) {
     for (mut velocity, input, look_direction, state) in players {
         let movement_stats = state.movement_stats();
-        
+
         let mut target_velocity = input.axis_pair(&PlayerInput::Move);
         target_velocity.y = -target_velocity.y;
 
@@ -94,23 +96,24 @@ fn player_movement(
 
         let flat_velocity = velocity.xz();
 
-        let moved_flat_vel = flat_velocity.lerp(target_velocity, time.delta_secs() * movement_stats.acceleration);
+        let moved_flat_vel = flat_velocity.lerp(
+            target_velocity,
+            time.delta_secs() * movement_stats.acceleration,
+        );
 
         velocity.x = moved_flat_vel.x;
         velocity.z = moved_flat_vel.y;
     }
 }
 
-fn player_gravity(players: Query<(&mut LinearVelocity, &CharacterBody)>, time: Res<Time>) {
-    for (mut velocity, body) in players {
-        if body.grounded {
-            velocity.y = 0.0;
+fn player_gravity(players: Query<(&mut LinearVelocity, &StateMachine)>, time: Res<Time>) {
+    for (mut velocity, state) in players {
+        let (up_gravity, down_gravity) = state.gravity();
+
+        if velocity.y > 0.0 {
+            velocity.y -= time.delta_secs() * up_gravity;
         } else {
-            if velocity.y > 0.0 {
-                velocity.y -= time.delta_secs() * 10.0;
-            } else {
-                velocity.y -= time.delta_secs() * 15.0;
-            }
+            velocity.y -= time.delta_secs() * down_gravity;
         }
     }
 }
