@@ -89,12 +89,13 @@ impl PlayerStateMachine for StateMachine {
                 MinorGroundState::Crouched => return JumpPossibility::CrouchJump,
             },
             MajorMoveState::Airborne(substate) => match substate {
-                MinorAirborneState::Dive | MinorAirborneState::Glide => {
+                MinorAirborneState::Dive => {
                     return JumpPossibility::DiveJump;
                 }
                 MinorAirborneState::Jumping
                 | MinorAirborneState::Falling
-                | MinorAirborneState::CrouchJump => return JumpPossibility::No,
+                | MinorAirborneState::CrouchJump
+                | MinorAirborneState::Glide => return JumpPossibility::No,
             },
         }
     }
@@ -168,7 +169,7 @@ impl PlayerStateMachine for StateMachine {
         match self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
                 MinorGroundState::Moving => return (0.0, 0.0, 0.0),
-                MinorGroundState::Sliding => return (20.0, 20.0, f32::INFINITY),
+                MinorGroundState::Sliding => return (60.0, 60.0, f32::INFINITY),
                 MinorGroundState::Crouched => return (20.0, 20.0, f32::INFINITY),
             },
             MajorMoveState::Airborne(substate) => match substate {

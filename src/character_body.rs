@@ -100,12 +100,12 @@ fn character_body_snap(
         &mut CharacterBody,
         &Collider,
         &mut Transform,
-        &LinearVelocity,
+        &mut LinearVelocity,
         &CharacterGroundSnap,
     )>,
     force_slide: Query<&ForceSlide>,
 ) {
-    for (entity, mut body, collider, mut transform, velocity, snap) in bodies.into_iter() {
+    for (entity, mut body, collider, mut transform, mut velocity, snap) in bodies.into_iter() {
         // TODO: ADD VELOCITY DEPENDANT SNAPPING
         let _ = velocity;
 
@@ -129,6 +129,7 @@ fn character_body_snap(
             |hit| {
                 if hit.normal.dot(*body.up) > body.max_dot_variance {
                     touched_floor = true;
+                    //velocity.0 = (velocity.0.reject_from_normalized(hit.normal.as_vec3())).normalize_or_zero() * velocity.0.length();
                 }
 
                 if force_slide.get(hit.entity).is_ok() {
@@ -142,7 +143,7 @@ fn character_body_snap(
         if touched_floor {
             transform.translation = snap_movement.position;
         } else {
-            body.grounded = false
+            body.grounded = false;
         }
     }
 }

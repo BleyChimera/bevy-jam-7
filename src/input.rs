@@ -30,6 +30,7 @@ impl Actionlike for PlayerInput {
 impl PlayerInput {
     pub fn default_input_map() -> InputMap<PlayerInput> {
         InputMap::default()
+            // Keyboard
             .with_dual_axis(
                 PlayerInput::Move,
                 VirtualDPad::wasd().with_circle_bounds(1.0),
@@ -41,6 +42,21 @@ impl PlayerInput {
                 )),
             )
             .with(PlayerInput::Jump, KeyCode::Space)
-            .with(PlayerInput::Jump, KeyCode::ControlLeft)
+            .with(PlayerInput::Crouch, KeyCode::ControlLeft)
+            // Controller
+            .with_dual_axis(
+                PlayerInput::Move,
+                GamepadStick::LEFT
+                    .with_circle_bounds(1.0)
+                    .with_deadzone(-0.01, 0.01),
+            )
+            .with_dual_axis(
+                PlayerInput::Camera,
+                GamepadStick::RIGHT
+                    .with_circle_bounds(1.0)
+                    .with_deadzone(-0.01, 0.01),
+            )
+            .with(PlayerInput::Jump, GamepadButton::South)
+            .with(PlayerInput::Crouch, GamepadButton::West)
     }
 }

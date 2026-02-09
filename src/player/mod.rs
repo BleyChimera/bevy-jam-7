@@ -18,7 +18,10 @@ impl Plugin for PlayerPlugin {
 
         app.add_plugins(state_machine::StateMachinePlugin);
 
-        app.add_systems(Update, move_camera);
+        app.add_systems(
+            Update,
+            ((rotate_camera_manual, move_camera), unstuck_camera).chain(),
+        );
 
         app.add_systems(
             FixedUpdate,
@@ -35,7 +38,21 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
-#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49, last_normal: Dir3::Y, force_slide: false}, CharacterGroundSnap {distance: 0.5}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, StateMachine,)]
+#[require(
+    CharacterBody {
+            grounded: true,
+            up: Dir3::Y,
+            max_dot_variance: 0.49,
+            last_normal: Dir3::Y,
+            force_slide: false,
+        },
+        CharacterGroundSnap { distance: 0.5 },
+        Collider::capsule(0.2, 0.8),
+        PlayerMarker,
+        PlayerLookDirection,
+        StateMachine,
+        SleepingDisabled,
+)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
 
@@ -47,24 +64,29 @@ pub struct PlayerLookDirection(pub Vec3);
 #[reflect(Component)]
 pub struct PlayerMarker;
 
-#[derive(Component, Reflect, Clone, Copy, Default)]
+#[derive(Component, Reflect, Clone, Copy)]
 #[reflect(Component)]
-pub struct CameraPivot;
+pub struct CameraPivot(pub Entity);
 
-fn move_camera(
-    query: Query<(&mut Transform, &ChildOf), With<CameraPivot>>,
-    mut players: Query<(&mut PlayerLookDirection, &ActionState<PlayerInput>)>,
+fn rotate_camera_manual(
+    query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
+    mut players: Query<
+        (&mut PlayerLookDirection, &ActionState<PlayerInput>),
+        With<PlayerCharacterMarker>,
+    >,
     time: Res<Time>,
 ) {
-    for (mut transform, child_of) in query {
-        let (mut direction, input) = players.get_mut(child_of.0).unwrap();
+    for (mut transform, pivot) in query {
+        let Ok((mut direction, input)) = players.get_mut(pivot.0) else {
+            continue;
+        };
 
         let camera_movement = input.axis_pair(&PlayerInput::Camera) * time.delta_secs();
 
         let mut euler_angles = transform.rotation.to_euler(EulerRot::YXZ);
         let old_euler_angles = euler_angles;
 
-        euler_angles.1 += camera_movement.y;
+        euler_angles.1 -= camera_movement.y;
         euler_angles.1 = euler_angles
             .1
             .clamp(-80.0_f32.to_radians(), 80.0_f32.to_radians());
@@ -72,9 +94,71 @@ fn move_camera(
         let diff = euler_angles.1 - old_euler_angles.1;
 
         transform.rotate_local_x(diff);
-        transform.rotate_y(camera_movement.x);
+        transform.rotate_y(-camera_movement.x);
 
         direction.0 = transform.rotation * Vec3::Z;
+    }
+}
+
+fn move_camera(
+    query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
+    mut players: Query<(&Transform, &LinearVelocity), With<PlayerCharacterMarker>>,
+    time: Res<Time>,
+    spatial_query: SpatialQuery,
+) {
+    for (mut transform, pivot) in query {
+        let Ok((player_transform, velocity)) = players.get_mut(pivot.0) else {
+            continue;
+        };
+        let top_of_player = player_transform.translation;
+        let top_of_player = top_of_player + Vec3::Y * 0.5;
+
+        let cast = spatial_query.cast_ray(
+            top_of_player,
+            Dir3::new(velocity.0).unwrap_or(Dir3::Y),
+            (velocity.0 / 4.0).length(),
+            false,
+            &SpatialQueryFilter::from_excluded_entities([pivot.0]),
+        );
+
+        let target_point = if let Some(cast) = cast {
+            top_of_player + velocity.0.normalize_or_zero() * cast.distance
+        } else {
+            top_of_player + velocity.0 / 4.0
+        };
+
+        transform.translation = transform.translation.move_towards(
+            target_point,
+            time.delta_secs() * (transform.translation - target_point).length() * 15.0,
+        );
+    }
+}
+
+fn unstuck_camera(
+    pivots: Query<(&Transform, &CameraPivot)>,
+    cameras: Query<(&mut Transform, &ChildOf), Without<CameraPivot>>,
+    //time: Res<Time>,
+    spatial_query: SpatialQuery,
+) {
+    for (mut transform, parent) in cameras {
+        let Ok((pivot_transform, pivot)) = pivots.get(parent.0) else {
+            continue;
+        };
+
+        let cast = spatial_query.cast_shape(
+            &Collider::sphere(0.1),
+            pivot_transform.translation,
+            Quat::IDENTITY,
+            Dir3::new(pivot_transform.rotation * Vec3::Z).unwrap(),
+            &ShapeCastConfig {max_distance: 10.0, target_distance:0.0, compute_contact_on_penetration: true, ignore_origin_penetration: true,},
+            &SpatialQueryFilter::from_excluded_entities([pivot.0]),
+        );
+
+        if let Some(cast) = cast {
+            transform.translation.z = cast.distance;
+        } else {
+            transform.translation.z = 10.0;
+        }
     }
 }
 
@@ -96,7 +180,7 @@ fn player_slide(
 ) {
     for (mut state, velocity, input, body) in players {
         // Return early if slide is forced
-        if body.force_slide && state.is_grounded() {
+        if body.force_slide && state.is_grounded() && velocity.length_squared() > 0.001 {
             state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
             continue;
         }
@@ -105,7 +189,7 @@ fn player_slide(
             MajorMoveState::Grounded(substate) => match substate {
                 // Slide if you can
                 MinorGroundState::Moving | MinorGroundState::Crouched => {
-                    if velocity.length() > 5.0 && input.pressed(&PlayerInput::Crouch) {
+                    if velocity.length() > 7.5 && input.pressed(&PlayerInput::Crouch) {
                         state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
                     }
                     if body.force_slide {
@@ -145,25 +229,35 @@ fn player_movement(
             .rotate(*look_dir)
             .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
 
-        let mut target_velocity = input_direction * movement_stats.max_speed;
-        let mut acceleration = movement_stats.acceleration;
-
         let flat_velocity = velocity.xz();
 
-        if velocity.length() > movement_stats.max_speed {
+        if velocity.length() > movement_stats.max_speed * 1.01
+            && input_direction.length_squared() > 0.01
+        {
             if input_direction.length_squared() > 0.01 {
-                let new_target = flat_velocity.length() * input_direction;
+                let simmilarity = input_direction.dot(flat_velocity).max(0.0);
 
-                target_velocity = new_target;
-                acceleration = movement_stats.rotation_rate;
+                let target_velocity = simmilarity * input_direction;
+
+                let moved_flat_vel = flat_velocity.move_towards(
+                    target_velocity,
+                    time.delta_secs() * movement_stats.rotation_rate,
+                );
+
+                velocity.x = moved_flat_vel.x;
+                velocity.z = moved_flat_vel.y;
             }
+        } else {
+            let target_velocity = input_direction * movement_stats.max_speed;
+
+            let moved_flat_vel = flat_velocity.move_towards(
+                target_velocity,
+                time.delta_secs() * movement_stats.acceleration,
+            );
+
+            velocity.x = moved_flat_vel.x;
+            velocity.z = moved_flat_vel.y;
         }
-
-        let moved_flat_vel =
-            flat_velocity.move_towards(target_velocity, time.delta_secs() * acceleration);
-
-        velocity.x = moved_flat_vel.x;
-        velocity.z = moved_flat_vel.y;
     }
 }
 
