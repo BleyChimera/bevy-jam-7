@@ -43,10 +43,15 @@ fn character_body_movement(
         &Collider,
         &mut Transform,
         &mut LinearVelocity,
+        Option<&CharacterGroundSnap>,
     )>,
     time: Res<Time>,
 ) {
-    for (entity, mut body, collider, mut transform, mut velocity) in bodies.into_iter() {
+    for (entity, mut body, collider, mut transform, mut velocity, snap) in bodies.into_iter() {
+        if snap.is_none() {
+            body.grounded = false;
+        }
+
         let move_result = sliding.move_and_slide(
             collider,
             transform.translation,
