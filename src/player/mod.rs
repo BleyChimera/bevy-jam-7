@@ -25,7 +25,7 @@ impl Plugin for PlayerPlugin {
             ((
                 player_check_floor,
                 player_reset_y_vel,
-                (player_movement, player_gravity),
+                (player_gravity, player_movement),
             )
                 .chain()
                 .after(PhysicsSystems::Last),),
@@ -95,38 +95,36 @@ fn player_movement(
     time: Res<Time>,
 ) {
     for (mut velocity, input, look_direction, state) in players {
-        bevy::app::hotpatch::call(|| {
-            let movement_stats = state.movement_stats();
+        let movement_stats = state.movement_stats();
 
-            let mut input_direction = input.axis_pair(&PlayerInput::Move);
-            input_direction.y = -input_direction.y;
+        let mut input_direction = input.axis_pair(&PlayerInput::Move);
+        input_direction.y = -input_direction.y;
 
-            let look_dir = Dir2::new(look_direction.0.xz()).unwrap_or(Dir2::Y);
+        let look_dir = Dir2::new(look_direction.0.xz()).unwrap_or(Dir2::Y);
 
-            input_direction = input_direction
-                .rotate(*look_dir)
-                .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
+        input_direction = input_direction
+            .rotate(*look_dir)
+            .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
 
-            let mut target_velocity = input_direction * movement_stats.max_speed;
+        let mut target_velocity = input_direction * movement_stats.max_speed;
+        let mut acceleration = movement_stats.acceleration;
 
-            let flat_velocity = velocity.xz();
+        let flat_velocity = velocity.xz();
 
-            if velocity.length() > movement_stats.max_speed {
-                if input_direction.length_squared() > 0.01 {
-                    let new_target = flat_velocity.length() * input_direction;
-                    
-                    target_velocity = new_target;
-                }
+        if velocity.length() > movement_stats.max_speed {
+            if input_direction.length_squared() > 0.01 {
+                let new_target = flat_velocity.length() * input_direction;
+
+                target_velocity = new_target;
+                //acceleration = movement_stats.rotation_rate;
             }
+        }
 
-            let moved_flat_vel = flat_velocity.move_towards(
-                target_velocity,
-                time.delta_secs() * movement_stats.acceleration,
-            );
+        let moved_flat_vel =
+            flat_velocity.move_towards(target_velocity, time.delta_secs() * acceleration);
 
-            velocity.x = moved_flat_vel.x;
-            velocity.z = moved_flat_vel.y;
-        });
+        velocity.x = moved_flat_vel.x;
+        velocity.z = moved_flat_vel.y;
     }
 }
 

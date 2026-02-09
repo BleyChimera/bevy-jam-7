@@ -118,21 +118,21 @@ impl PlayerStateMachine for StateMachine {
                     return MovementStats {
                         max_speed: 10.0,
                         acceleration: 30.0,
-                        rotation_rate: 1.0,
+                        rotation_rate: 10.0,
                     };
                 }
                 MinorGroundState::Sliding => {
                     return MovementStats {
                         max_speed: 0.0,
-                        acceleration: 20.0,
-                        rotation_rate: 1.0,
+                        acceleration: 0.0,
+                        rotation_rate: 20.0,
                     };
                 }
                 MinorGroundState::Crouched => {
                     return MovementStats {
                         max_speed: 0.0,
                         acceleration: 10.0,
-                        rotation_rate: 0.0,
+                        rotation_rate: 10.0,
                     };
                 }
             },
@@ -159,7 +159,7 @@ impl PlayerStateMachine for StateMachine {
     }
 
     fn gravity(&self) -> (f32, f32, f32) {
-        return bevy::app::hotpatch::call(|| match self.movement_state {
+        match self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
                 MinorGroundState::Moving => return (0.0, 0.0, 0.0),
                 MinorGroundState::Sliding => return (20.0, 20.0, f32::INFINITY),
@@ -172,6 +172,6 @@ impl PlayerStateMachine for StateMachine {
                 MinorAirborneState::Glide => return (1.0, 1.0, 5.0),
                 MinorAirborneState::Dive => return (40.0, 160.0, 40.0),
             },
-        });
+        }
     }
 }
