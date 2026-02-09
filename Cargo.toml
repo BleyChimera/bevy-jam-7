@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 avian3d = { git = "https://github.com/avianphysics/avian", rev = "4e0c808823b6d6d2b347dd2fc743c97966e9dc26" }
-bevy = { version = "0.18", features = ["dynamic_linking","debug","hotpatching","file_watcher"] }
+bevy = { version = "0.18" }
 bevy-inspector-egui = "0.36.0"
 bevy_seedling = "0.7.0"
 bevy_skein = "0.5.0"
@@ -20,8 +20,12 @@ tracing = { version = "0.1", features = [
     "release_max_level_warn",
 ] }
 
-[target.'cfg(not(target_arch="wasm32"))'.dependencies]
-foo = "0.0.0"
+[target.'cfg(not(target_arch = "wasm32"))'.features]
+default = ["dev_tools"]
+
+[features]
+dev_tools = ["bevy/debug","bevy/dynamic_linking","bevy/file_watcher","bevy/hotpatching"]
+
 
 # Idiomatic Bevy code often triggers these lints, and the CI workflow treats them as errors.
 # In some cases they may still signal poor code quality however, so consider commenting out these lines.

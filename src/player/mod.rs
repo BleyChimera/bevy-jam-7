@@ -5,6 +5,8 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
+use state_machine::*;
+
 pub mod state_machine;
 
 pub struct PlayerPlugin;
@@ -24,7 +26,7 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
-#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.1}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, state_machine::StateMachine,)]
+#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.1}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, StateMachine,)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
 
@@ -63,9 +65,7 @@ fn move_camera(
         transform.rotate_local_x(diff);
         transform.rotate_y(camera_movement.x);
 
-        bevy::app::hotpatch::call(|| {
-            direction.0 = transform.rotation * Vec3::Z;
-        })
+        direction.0 = transform.rotation * Vec3::Z;
     }
 }
 
@@ -73,54 +73,44 @@ fn player_movement(
     players: Query<(
         &mut LinearVelocity,
         &ActionState<PlayerInput>,
-        &CharacterBody,
         &PlayerLookDirection,
+        &StateMachine,
     )>,
     time: Res<Time>,
 ) {
-    for (mut velocity, input, body, look_direction) in players {
-        bevy::app::hotpatch::call(|| {
-            if body.grounded {
-                let mut target_velocity = input.axis_pair(&PlayerInput::Move);
-                target_velocity.y = -target_velocity.y;
+    for (mut velocity, input, look_direction, state) in players {
+        let movement_stats = state.movement_stats();
+        
+        let mut target_velocity = input.axis_pair(&PlayerInput::Move);
+        target_velocity.y = -target_velocity.y;
 
-                let look_dir = Dir2::new(look_direction.0.xz()).unwrap_or(Dir2::Y);
+        let look_dir = Dir2::new(look_direction.0.xz()).unwrap_or(Dir2::Y);
 
-                target_velocity = target_velocity
-                    .rotate(*look_dir)
-                    .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
+        target_velocity = target_velocity
+            .rotate(*look_dir)
+            .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
 
-                target_velocity = target_velocity * 10.0;
+        target_velocity = target_velocity * movement_stats.max_speed;
 
-                let flat_velocity = velocity.xz();
+        let flat_velocity = velocity.xz();
 
-                let moved_flat_vel = flat_velocity.lerp(target_velocity, time.delta_secs() * 30.0);
+        let moved_flat_vel = flat_velocity.lerp(target_velocity, time.delta_secs() * movement_stats.acceleration);
 
-                velocity.x = moved_flat_vel.x;
-                velocity.z = moved_flat_vel.y;
-
-                info!("{:?} {:?}", target_velocity, velocity);
-            } else {
-                println!(
-                    "You really need a state machine or a component that determines movement stats on several states"
-                );
-            }
-        })
+        velocity.x = moved_flat_vel.x;
+        velocity.z = moved_flat_vel.y;
     }
 }
 
 fn player_gravity(players: Query<(&mut LinearVelocity, &CharacterBody)>, time: Res<Time>) {
     for (mut velocity, body) in players {
-        bevy::app::hotpatch::call(|| {
-            if body.grounded {
-                velocity.y = 0.0;
+        if body.grounded {
+            velocity.y = 0.0;
+        } else {
+            if velocity.y > 0.0 {
+                velocity.y -= time.delta_secs() * 10.0;
             } else {
-                if velocity.y > 0.0 {
-                    velocity.y -= time.delta_secs() * 10.0;
-                } else {
-                    velocity.y -= time.delta_secs() * 15.0;
-                }
+                velocity.y -= time.delta_secs() * 15.0;
             }
-        })
+        }
     }
 }
