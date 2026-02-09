@@ -22,7 +22,10 @@ impl Plugin for PlayerPlugin {
 
         app.add_systems(
             FixedUpdate,
-            (player_movement, player_gravity, player_check_floor).after(PhysicsSystems::Last),
+            ((player_check_floor, player_reset_y_vel)
+                .chain()
+                .before((player_movement, player_gravity)))
+            .after(PhysicsSystems::Last),
         );
     }
 }
@@ -31,8 +34,6 @@ impl Plugin for PlayerPlugin {
 #[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.5}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, StateMachine,)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
-
-pub struct Coyot
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
 #[reflect(Component)]
@@ -70,6 +71,14 @@ fn move_camera(
         transform.rotate_y(camera_movement.x);
 
         direction.0 = transform.rotation * Vec3::Z;
+    }
+}
+
+fn player_reset_y_vel(players: Query<(&mut LinearVelocity, &StateMachine)>) {
+    for (mut velocity, state) in players {
+        if state.set_y_0() {
+            velocity.y = 0.0;
+        }
     }
 }
 

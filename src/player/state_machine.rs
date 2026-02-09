@@ -56,6 +56,10 @@ pub trait PlayerStateMachine {
     /// Can the player enter a jumpin state?
     fn can_jump(&self) -> JumpPossibility;
 
+    /// Check if machine is in a state where the y of the velocity should be 0.0
+    fn set_y_0(&self) -> bool;
+
+    /// Check if machine is in a grounded state
     fn is_grounded(&self) -> bool;
 
     /// Obtain the movement stats of a movement state
@@ -84,6 +88,17 @@ impl PlayerStateMachine for StateMachine {
             MajorMoveState::Airborne(_substate) => {
                 return JumpPossibility::No;
             }
+        }
+    }
+
+    fn set_y_0(&self) -> bool {
+        match self.movement_state {
+            MajorMoveState::Grounded(substate) => match substate {
+                MinorGroundState::Moving => true,
+                MinorGroundState::Sliding => false,
+                MinorGroundState::Crouched => false,
+            },
+            MajorMoveState::Airborne(_) => false,
         }
     }
 

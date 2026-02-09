@@ -13,6 +13,7 @@ pub enum PlayerInput {
     Move,
     Camera,
     Jump,
+    Crouch,
 }
 
 impl Actionlike for PlayerInput {
@@ -21,6 +22,7 @@ impl Actionlike for PlayerInput {
             PlayerInput::Move => InputControlKind::DualAxis,
             PlayerInput::Camera => InputControlKind::DualAxis,
             PlayerInput::Jump => InputControlKind::Button,
+            PlayerInput::Crouch => InputControlKind::Button,
         }
     }
 }
@@ -39,5 +41,6 @@ impl PlayerInput {
                 )),
             )
             .with(PlayerInput::Jump, KeyCode::Space)
+            .with(PlayerInput::Jump, KeyCode::ControlLeft)
     }
 }
