@@ -1,4 +1,4 @@
-use crate::character_body::CharacterBody;
+use crate::character_body::{CharacterBody, CharacterGroundSnap};
 use crate::input::PlayerInput;
 
 use avian3d::prelude::*;
@@ -22,7 +22,7 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
-#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection)]
+#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.1}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
 
@@ -60,7 +60,7 @@ fn move_camera(
 
         transform.rotate_local_x(diff);
         transform.rotate_y(camera_movement.x);
-        
+
         bevy::app::hotpatch::call(|| {
             direction.0 = transform.rotation * Vec3::Z;
         })
@@ -79,9 +79,10 @@ fn player_movement(
         bevy::app::hotpatch::call(|| {
             if body.grounded {
                 let target_velocity = input.axis_pair(&PlayerInput::Move);
-            }
-            else {
-                println!("You really need a state machine or a component that determines movement stats on several states");
+            } else {
+                println!(
+                    "You really need a state machine or a component that determines movement stats on several states"
+                );
             }
         })
     }
@@ -95,8 +96,7 @@ fn player_gravity(players: Query<(&mut LinearVelocity, &CharacterBody)>, time: R
             } else {
                 if velocity.y > 0.0 {
                     velocity.y -= time.delta_secs() * 10.0;
-                }
-                else {
+                } else {
                     velocity.y -= time.delta_secs() * 15.0;
                 }
             }

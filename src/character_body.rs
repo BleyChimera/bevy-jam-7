@@ -5,11 +5,12 @@ pub struct CharacterBodyPlugin;
 
 impl Plugin for CharacterBodyPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<CharacterBody>();
+        app.register_type::<CharacterBody>()
+            .register_type::<CharacterGroundSnap>();
 
         app.add_systems(
             FixedUpdate,
-            (character_body_movement,).in_set(PhysicsSystems::Last),
+            ((character_body_movement, character_body_snap).chain()).in_set(PhysicsSystems::Last),
         );
     }
 }
@@ -26,6 +27,12 @@ pub struct CharacterBody {
     pub grounded: bool,
     pub up: Dir3,
     pub max_dot_variance: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Reflect, Component)]
+#[reflect(Component)]
+pub struct CharacterGroundSnap {
+    pub distance: f32,
 }
 
 fn character_body_movement(
@@ -62,6 +69,23 @@ fn character_body_movement(
 
         transform.translation = move_result.position;
         velocity.0 = move_result.projected_velocity;
+    }
+}
+
+fn character_body_snap(
+    sliding: MoveAndSlide,
+    bodies: Query<(
+        Entity,
+        &mut CharacterBody,
+        &Collider,
+        &mut Transform,
+        &LinearVelocity,
+        &CharacterGroundSnap,
+    )>,
+) {
+    for (entity, mut body, collider, mut transform, velocity, snap) in bodies.into_iter() {
+        // TODO: ADD VELOCITY DEPENDANT SNAPPING
+        let _ = velocity;
 
         if !body.grounded {
             continue;
@@ -72,7 +96,7 @@ fn character_body_movement(
             collider,
             transform.translation,
             transform.rotation,
-            -*body.up,
+            -*body.up * snap.distance,
             std::time::Duration::from_secs(1),
             &MoveAndSlideConfig {
                 move_and_slide_iterations: 1,
