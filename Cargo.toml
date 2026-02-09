@@ -20,8 +20,8 @@ tracing = { version = "0.1", features = [
     "release_max_level_warn",
 ] }
 
-[target.'cfg(not(target_arch = "wasm32"))'.features]
-default = ["dev_tools"]
+#[target.'cfg(not(target_arch = "wasm32"))'.target]
+#default = ["dev_tools"]
 
 [features]
 dev_tools = ["bevy/debug","bevy/dynamic_linking","bevy/file_watcher","bevy/hotpatching"]
