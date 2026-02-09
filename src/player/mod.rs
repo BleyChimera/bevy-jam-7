@@ -22,15 +22,17 @@ impl Plugin for PlayerPlugin {
 
         app.add_systems(
             FixedUpdate,
-            (player_movement, player_gravity).after(PhysicsSystems::Last),
+            (player_movement, player_gravity, player_check_floor).after(PhysicsSystems::Last),
         );
     }
 }
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
-#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.1}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, StateMachine,)]
+#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.5}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, StateMachine,)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
+
+pub struct Coyot
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
 #[reflect(Component)]
@@ -81,39 +83,57 @@ fn player_movement(
     time: Res<Time>,
 ) {
     for (mut velocity, input, look_direction, state) in players {
-        let movement_stats = state.movement_stats();
+        bevy::app::hotpatch::call(|| {
+            let movement_stats = state.movement_stats();
 
-        let mut target_velocity = input.axis_pair(&PlayerInput::Move);
-        target_velocity.y = -target_velocity.y;
+            let mut target_velocity = input.axis_pair(&PlayerInput::Move);
+            target_velocity.y = -target_velocity.y;
 
-        let look_dir = Dir2::new(look_direction.0.xz()).unwrap_or(Dir2::Y);
+            let look_dir = Dir2::new(look_direction.0.xz()).unwrap_or(Dir2::Y);
 
-        target_velocity = target_velocity
-            .rotate(*look_dir)
-            .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
+            target_velocity = target_velocity
+                .rotate(*look_dir)
+                .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
 
-        target_velocity = target_velocity * movement_stats.max_speed;
+            target_velocity = target_velocity * movement_stats.max_speed;
 
-        let flat_velocity = velocity.xz();
+            let flat_velocity = velocity.xz();
 
-        let moved_flat_vel = flat_velocity.lerp(
-            target_velocity,
-            time.delta_secs() * movement_stats.acceleration,
-        );
+            let moved_flat_vel = flat_velocity.lerp(
+                target_velocity,
+                time.delta_secs() * movement_stats.acceleration,
+            );
 
-        velocity.x = moved_flat_vel.x;
-        velocity.z = moved_flat_vel.y;
+            velocity.x = moved_flat_vel.x;
+            velocity.z = moved_flat_vel.y;
+        });
+    }
+}
+
+fn player_check_floor(players: Query<(&mut StateMachine, &CharacterBody)>) {
+    for (mut machine, body) in players {
+        if machine.is_grounded() && !body.grounded {
+            machine.movement_state = MajorMoveState::Airborne(MinorAirborneState::Falling);
+        }
+
+        if !machine.is_grounded() && body.grounded {
+            machine.movement_state = MajorMoveState::Grounded(MinorGroundState::Moving);
+        }
     }
 }
 
 fn player_gravity(players: Query<(&mut LinearVelocity, &StateMachine)>, time: Res<Time>) {
     for (mut velocity, state) in players {
-        let (up_gravity, down_gravity) = state.gravity();
+        let (up_gravity, down_gravity, terminal_velocity) = state.gravity();
 
         if velocity.y > 0.0 {
             velocity.y -= time.delta_secs() * up_gravity;
         } else {
             velocity.y -= time.delta_secs() * down_gravity;
+        }
+
+        if velocity.y < -terminal_velocity {
+            velocity.y = -terminal_velocity;
         }
     }
 }

@@ -11,6 +11,7 @@ impl Plugin for StateMachinePlugin {
 #[reflect(Component)]
 pub struct StateMachine {
     pub movement_state: MajorMoveState,
+    pub coyote_timer: f32,
 }
 
 #[derive(Reflect, Clone, Copy)]
@@ -39,6 +40,7 @@ pub enum MinorAirborneState {
     Falling,
     Jumping,
     CrouchJump,
+    Dive,
     Glide,
 }
 
@@ -54,11 +56,13 @@ pub trait PlayerStateMachine {
     /// Can the player enter a jumpin state?
     fn can_jump(&self) -> JumpPossibility;
 
+    fn is_grounded(&self) -> bool;
+
     /// Obtain the movement stats of a movement state
     fn movement_stats(&self) -> MovementStats;
 
-    /// Gravity in format (gravity_up, gravity_down)
-    fn gravity(&self) -> (f32, f32);
+    /// Gravity in format (gravity_up, gravity_down, terminal_velocity)
+    fn gravity(&self) -> (f32, f32, f32);
 }
 
 pub struct MovementStats {
@@ -83,6 +87,13 @@ impl PlayerStateMachine for StateMachine {
         }
     }
 
+    fn is_grounded(&self) -> bool {
+        match self.movement_state {
+            MajorMoveState::Grounded(_) => true,
+            MajorMoveState::Airborne(_) => false,
+        }
+    }
+
     fn movement_stats(&self) -> MovementStats {
         match self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
@@ -98,33 +109,47 @@ impl PlayerStateMachine for StateMachine {
                         acceleration: 0.0,
                     };
                 }
-                MinorGroundState::Crouched => todo!(),
+                MinorGroundState::Crouched => {
+                    return MovementStats {
+                        max_speed: 0.0,
+                        acceleration: 10.0,
+                    };
+                }
             },
             MajorMoveState::Airborne(substate) => match substate {
-                MinorAirborneState::Falling => todo!(),
+                MinorAirborneState::Falling => {
+                    return MovementStats {
+                        max_speed: 10.0,
+                        acceleration: 10.0,
+                    };
+                }
                 MinorAirborneState::Jumping => todo!(),
                 MinorAirborneState::CrouchJump => todo!(),
                 MinorAirborneState::Glide => todo!(),
+                MinorAirborneState::Dive => {
+                    return MovementStats {
+                        max_speed: 10.0,
+                        acceleration: 5.0,
+                    };
+                }
             },
         }
     }
 
-    fn gravity(&self) -> (f32, f32) {
-        return bevy::app::hotpatch::call(|| {
-            match self.movement_state {
-                MajorMoveState::Grounded(substate) => match substate {
-                    MinorGroundState::Moving => return (0.0, 0.0),
-                    MinorGroundState::Sliding => return (20.0, 20.0),
-                    MinorGroundState::Crouched => return (20.0, 20.0),
-                },
-                MajorMoveState::Airborne(substate) => match substate {
-                    MinorAirborneState::Falling => todo!(),
-                    MinorAirborneState::Jumping => todo!(),
-                    MinorAirborneState::CrouchJump => todo!(),
-                    MinorAirborneState::Glide => todo!(),
-                },
-            }
-            return (10.0, 15.0);
+    fn gravity(&self) -> (f32, f32, f32) {
+        return bevy::app::hotpatch::call(|| match self.movement_state {
+            MajorMoveState::Grounded(substate) => match substate {
+                MinorGroundState::Moving => return (0.0, 0.0, 0.0),
+                MinorGroundState::Sliding => return (20.0, 20.0, f32::INFINITY),
+                MinorGroundState::Crouched => return (20.0, 20.0, f32::INFINITY),
+            },
+            MajorMoveState::Airborne(substate) => match substate {
+                MinorAirborneState::Falling
+                | MinorAirborneState::Jumping
+                | MinorAirborneState::CrouchJump => return (10.0, 15.0, 15.0),
+                MinorAirborneState::Glide => return (1.0, 1.0, 5.0),
+                MinorAirborneState::Dive => return (40.0, 160.0, 40.0),
+            },
         });
     }
 }
