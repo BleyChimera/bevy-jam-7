@@ -5,6 +5,8 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
+pub mod state_machine;
+
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
@@ -22,7 +24,7 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
-#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.1}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection)]
+#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49}, CharacterGroundSnap {distance: 0.1}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, state_machine::StateMachine,)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
 
@@ -72,13 +74,32 @@ fn player_movement(
         &mut LinearVelocity,
         &ActionState<PlayerInput>,
         &CharacterBody,
+        &PlayerLookDirection,
     )>,
     time: Res<Time>,
 ) {
-    for (mut velocity, input, body) in players {
+    for (mut velocity, input, body, look_direction) in players {
         bevy::app::hotpatch::call(|| {
             if body.grounded {
-                let target_velocity = input.axis_pair(&PlayerInput::Move);
+                let mut target_velocity = input.axis_pair(&PlayerInput::Move);
+                target_velocity.y = -target_velocity.y;
+
+                let look_dir = Dir2::new(look_direction.0.xz()).unwrap_or(Dir2::Y);
+
+                target_velocity = target_velocity
+                    .rotate(*look_dir)
+                    .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
+
+                target_velocity = target_velocity * 10.0;
+
+                let flat_velocity = velocity.xz();
+
+                let moved_flat_vel = flat_velocity.lerp(target_velocity, time.delta_secs() * 30.0);
+
+                velocity.x = moved_flat_vel.x;
+                velocity.z = moved_flat_vel.y;
+
+                info!("{:?} {:?}", target_velocity, velocity);
             } else {
                 println!(
                     "You really need a state machine or a component that determines movement stats on several states"

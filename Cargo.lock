@@ -3062,6 +3062,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af9673d8203fcb076b19dfd17e38b3d4ae9f44959416ea532ce72415a6020365"
 
 [[package]]
+name = "extremely_incohesive_fever_dream"
+version = "0.1.0"
+dependencies = [
+ "avian3d",
+ "bevy",
+ "bevy-inspector-egui",
+ "bevy_seedling",
+ "bevy_skein",
+ "leafwing-input-manager",
+ "log",
+ "tracing",
+]
+
+[[package]]
 name = "fast-interleave"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3461,20 +3475,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54614a3312934d066701a80f20f15fa3b56d67ac7722b39eea5b4c9dd1d66c94"
 dependencies = [
  "thread_local",
-]
-
-[[package]]
-name = "gamejam_game"
-version = "0.1.0"
-dependencies = [
- "avian3d",
- "bevy",
- "bevy-inspector-egui",
- "bevy_seedling",
- "bevy_skein",
- "leafwing-input-manager",
- "log",
- "tracing",
 ]
 
 [[package]]
