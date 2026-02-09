@@ -6,7 +6,8 @@ pub struct CharacterBodyPlugin;
 impl Plugin for CharacterBodyPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<CharacterBody>()
-            .register_type::<CharacterGroundSnap>();
+            .register_type::<CharacterGroundSnap>()
+            .register_type::<ForceSlide>();
 
         app.add_systems(
             FixedUpdate,
@@ -14,6 +15,10 @@ impl Plugin for CharacterBodyPlugin {
         );
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Reflect, Component)]
+#[reflect(Component)]
+pub struct ForceSlide;
 
 #[derive(Debug, Clone, Copy, PartialEq, Reflect, Component)]
 #[require(
@@ -28,6 +33,7 @@ pub struct CharacterBody {
     pub up: Dir3,
     pub max_dot_variance: f32,
     pub last_normal: Dir3,
+    pub force_slide: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Reflect, Component)]
@@ -46,9 +52,12 @@ fn character_body_movement(
         &mut LinearVelocity,
         Option<&CharacterGroundSnap>,
     )>,
+    force_slide: Query<&ForceSlide>,
     time: Res<Time>,
 ) {
     for (entity, mut body, collider, mut transform, mut velocity, snap) in bodies.into_iter() {
+        body.force_slide = false;
+
         if snap.is_none() {
             body.grounded = false;
         }
@@ -70,6 +79,11 @@ fn character_body_movement(
                     body.grounded = true;
                 }
                 body.last_normal = *result.normal;
+
+                if force_slide.get(result.entity).is_ok() {
+                    body.force_slide = true;
+                }
+
                 MoveAndSlideHitResponse::Accept
             },
         );
@@ -89,6 +103,7 @@ fn character_body_snap(
         &LinearVelocity,
         &CharacterGroundSnap,
     )>,
+    force_slide: Query<&ForceSlide>,
 ) {
     for (entity, mut body, collider, mut transform, velocity, snap) in bodies.into_iter() {
         // TODO: ADD VELOCITY DEPENDANT SNAPPING
@@ -115,6 +130,11 @@ fn character_body_snap(
                 if hit.normal.dot(*body.up) > body.max_dot_variance {
                     touched_floor = true;
                 }
+
+                if force_slide.get(hit.entity).is_ok() {
+                    body.force_slide = true;
+                }
+
                 body.last_normal = *hit.normal;
                 MoveAndSlideHitResponse::Accept
             },

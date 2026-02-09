@@ -49,6 +49,7 @@ pub enum JumpPossibility {
     #[default]
     Jump,
     CrouchJump,
+    DiveJump,
     No,
 }
 
@@ -87,9 +88,14 @@ impl PlayerStateMachine for StateMachine {
                 }
                 MinorGroundState::Crouched => return JumpPossibility::CrouchJump,
             },
-            MajorMoveState::Airborne(_substate) => {
-                return JumpPossibility::No;
-            }
+            MajorMoveState::Airborne(substate) => match substate {
+                MinorAirborneState::Dive | MinorAirborneState::Glide => {
+                    return JumpPossibility::DiveJump;
+                }
+                MinorAirborneState::Jumping
+                | MinorAirborneState::Falling
+                | MinorAirborneState::CrouchJump => return JumpPossibility::No,
+            },
         }
     }
 

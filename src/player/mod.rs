@@ -25,6 +25,7 @@ impl Plugin for PlayerPlugin {
             ((
                 player_check_floor,
                 player_reset_y_vel,
+                player_slide,
                 (player_gravity, player_movement),
             )
                 .chain()
@@ -34,7 +35,7 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component, Reflect, Clone, Copy, Default)]
-#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49, last_normal: Dir3::Y}, CharacterGroundSnap {distance: 0.5}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, StateMachine,)]
+#[require(CharacterBody {grounded: true, up: Dir3::Y, max_dot_variance: 0.49, last_normal: Dir3::Y, force_slide: false}, CharacterGroundSnap {distance: 0.5}, Collider::capsule(0.2,0.8), PlayerMarker, PlayerLookDirection, StateMachine,)]
 #[reflect(Component)]
 pub struct PlayerCharacterMarker;
 
@@ -81,6 +82,44 @@ fn player_reset_y_vel(players: Query<(&mut LinearVelocity, &StateMachine)>, time
     for (mut velocity, state) in players {
         if state.set_y_0() {
             velocity.y = velocity.y.lerp(0.0, time.delta_secs() * 10.0);
+        }
+    }
+}
+
+fn player_slide(
+    players: Query<(
+        &mut StateMachine,
+        &LinearVelocity,
+        &ActionState<PlayerInput>,
+        &CharacterBody,
+    )>,
+) {
+    for (mut state, velocity, input, body) in players {
+        // Return early if slide is forced
+        if body.force_slide && state.is_grounded() {
+            state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
+            continue;
+        }
+
+        match state.movement_state {
+            MajorMoveState::Grounded(substate) => match substate {
+                // Slide if you can
+                MinorGroundState::Moving | MinorGroundState::Crouched => {
+                    if velocity.length() > 5.0 && input.pressed(&PlayerInput::Crouch) {
+                        state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
+                    }
+                    if body.force_slide {
+                        state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
+                    }
+                }
+                // Check if it can still slide
+                MinorGroundState::Sliding => {
+                    if velocity.length() < 5.0 || !input.pressed(&PlayerInput::Crouch) {
+                        state.movement_state = MajorMoveState::Grounded(MinorGroundState::Moving);
+                    }
+                }
+            },
+            MajorMoveState::Airborne(_) => continue,
         }
     }
 }
