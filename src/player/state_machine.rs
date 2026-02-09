@@ -110,6 +110,21 @@ impl PlayerStateMachine for StateMachine {
     }
 
     fn gravity(&self) -> (f32, f32) {
-        return (10.0, 15.0);
+        return bevy::app::hotpatch::call(|| {
+            match self.movement_state {
+                MajorMoveState::Grounded(substate) => match substate {
+                    MinorGroundState::Moving => return (0.0, 0.0),
+                    MinorGroundState::Sliding => return (20.0, 20.0),
+                    MinorGroundState::Crouched => return (20.0, 20.0),
+                },
+                MajorMoveState::Airborne(substate) => match substate {
+                    MinorAirborneState::Falling => todo!(),
+                    MinorAirborneState::Jumping => todo!(),
+                    MinorAirborneState::CrouchJump => todo!(),
+                    MinorAirborneState::Glide => todo!(),
+                },
+            }
+            return (10.0, 15.0);
+        });
     }
 }

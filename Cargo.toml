@@ -20,11 +20,12 @@ tracing = { version = "0.1", features = [
     "release_max_level_warn",
 ] }
 
-#[target.'cfg(not(target_arch = "wasm32"))'.target]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy = { version = "0.18", features = ["debug","dynamic_linking","file_watcher","hotpatching"]}
 #default = ["dev_tools"]
 
-[features]
-dev_tools = ["bevy/debug","bevy/dynamic_linking","bevy/file_watcher","bevy/hotpatching"]
+#[features]
+#dev_tools = ["bevy/debug","bevy/dynamic_linking","bevy/file_watcher","bevy/hotpatching"]
 
 
 # Idiomatic Bevy code often triggers these lints, and the CI workflow treats them as errors.
