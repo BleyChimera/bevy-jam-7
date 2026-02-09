@@ -27,6 +27,7 @@ pub struct CharacterBody {
     pub grounded: bool,
     pub up: Dir3,
     pub max_dot_variance: f32,
+    pub last_normal: Dir3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Reflect, Component)]
@@ -68,6 +69,7 @@ fn character_body_movement(
                 if result.normal.dot(*body.up) > body.max_dot_variance {
                     body.grounded = true;
                 }
+                body.last_normal = *result.normal;
                 MoveAndSlideHitResponse::Accept
             },
         );
@@ -113,6 +115,7 @@ fn character_body_snap(
                 if hit.normal.dot(*body.up) > body.max_dot_variance {
                     touched_floor = true;
                 }
+                body.last_normal = *hit.normal;
                 MoveAndSlideHitResponse::Accept
             },
         );

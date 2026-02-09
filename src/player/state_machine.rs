@@ -74,6 +74,8 @@ pub struct MovementStats {
     pub max_speed: f32,
     /// Constant acceleration on that state
     pub acceleration: f32,
+    /// When the player can only steer the movement use this value
+    pub rotation_rate: f32,
 }
 
 impl PlayerStateMachine for StateMachine {
@@ -116,18 +118,21 @@ impl PlayerStateMachine for StateMachine {
                     return MovementStats {
                         max_speed: 10.0,
                         acceleration: 30.0,
+                        rotation_rate: 1.0,
                     };
                 }
                 MinorGroundState::Sliding => {
                     return MovementStats {
                         max_speed: 0.0,
-                        acceleration: 0.0,
+                        acceleration: 20.0,
+                        rotation_rate: 1.0,
                     };
                 }
                 MinorGroundState::Crouched => {
                     return MovementStats {
                         max_speed: 0.0,
                         acceleration: 10.0,
+                        rotation_rate: 0.0,
                     };
                 }
             },
@@ -136,6 +141,7 @@ impl PlayerStateMachine for StateMachine {
                     return MovementStats {
                         max_speed: 10.0,
                         acceleration: 10.0,
+                        rotation_rate: 0.0,
                     };
                 }
                 MinorAirborneState::Jumping => todo!(),
@@ -145,6 +151,7 @@ impl PlayerStateMachine for StateMachine {
                     return MovementStats {
                         max_speed: 10.0,
                         acceleration: 5.0,
+                        rotation_rate: 0.0,
                     };
                 }
             },
