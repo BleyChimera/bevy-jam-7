@@ -238,7 +238,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
  "x11rb",
 ]
 
@@ -3070,6 +3070,7 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_seedling",
  "bevy_skein",
+ "foo",
  "leafwing-input-manager",
  "log",
  "tracing",
@@ -3366,6 +3367,12 @@ dependencies = [
  "tinyvec",
  "ttf-parser",
 ]
+
+[[package]]
+name = "foo"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7dbb6acfeff1d490fba693a402456f76b344fea77a5e7cae43b5970c3332b8f"
 
 [[package]]
 name = "foreign-types"
