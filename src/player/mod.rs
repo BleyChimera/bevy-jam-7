@@ -116,7 +116,7 @@ fn player_movement(
                 let new_target = flat_velocity.length() * input_direction;
 
                 target_velocity = new_target;
-                //acceleration = movement_stats.rotation_rate;
+                acceleration = movement_stats.rotation_rate;
             }
         }
 
