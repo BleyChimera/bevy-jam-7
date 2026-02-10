@@ -11,7 +11,8 @@ impl Plugin for StateMachinePlugin {
 #[reflect(Component)]
 pub struct StateMachine {
     pub movement_state: MajorMoveState,
-    pub coyote_timer: f32,
+    coyote_timer: f32,
+    stuck_in_state_timer: f32,
 }
 
 #[derive(Reflect, Clone, Copy)]
@@ -40,24 +41,20 @@ pub enum MinorAirborneState {
     Falling,
     Jumping,
     CrouchJump,
+    DiveJump,
     Dive,
     Glide,
 }
 
-#[derive(Clone, Copy, Default, Reflect)]
-pub enum JumpPossibility {
-    #[default]
-    Jump,
-    CrouchJump,
-    DiveJump,
-    No,
-}
-
 pub trait PlayerStateMachine {
-    /// Can the player enter a jumpin state?
-    fn can_jump(&self) -> JumpPossibility;
+    /// Try to get into a jumping state and return the new state
+    fn jump(&mut self) -> MajorMoveState;
 
-    fn tick(&mut self, time: Time) -> () {}
+    /// Transition to a new state unless stuck. Returns Ok(Old state) Err(New state)
+    fn transition(&mut self, new_state: MajorMoveState) -> Result<MajorMoveState, MajorMoveState>;
+
+    /// Update the state of the state machine
+    fn tick(&mut self, time: Time) -> ();
 
     /// Check if machine is in a state where the y of the velocity should be 0.0
     fn set_y_0(&self) -> bool;
@@ -82,34 +79,62 @@ pub struct MovementStats {
 }
 
 impl PlayerStateMachine for StateMachine {
-    fn can_jump(&self) -> JumpPossibility {
+    fn jump(&mut self) -> MajorMoveState {
+        let result;
+        
         match self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
                 MinorGroundState::Moving | MinorGroundState::Sliding => {
-                    return JumpPossibility::Jump;
+                    result = self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping));
                 }
-                MinorGroundState::Crouched => return JumpPossibility::CrouchJump,
+                MinorGroundState::Crouched => {
+                    result =
+                        self.transition(MajorMoveState::Airborne(MinorAirborneState::CrouchJump));
+                }
             },
             MajorMoveState::Airborne(substate) => match substate {
                 MinorAirborneState::Dive => {
-                    return JumpPossibility::DiveJump;
+                    result = self.transition(MajorMoveState::Airborne(MinorAirborneState::DiveJump));
                 }
                 MinorAirborneState::Jumping
+                | MinorAirborneState::DiveJump
                 | MinorAirborneState::Falling
                 | MinorAirborneState::CrouchJump
-                | MinorAirborneState::Glide => return JumpPossibility::No,
+                | MinorAirborneState::Glide => {
+                    if self.coyote_timer > 0.0 {
+                        result =
+                            self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping));
+                    }
+                }
             },
         }
+
+        return self.movement_state.clone();
     }
 
     fn tick(&mut self, time: Time) -> () {
         let delta = time.delta_secs();
+
         self.coyote_timer -= delta;
+        self.coyote_timer = self.coyote_timer.max(0.0);
+
+        self.stuck_in_state_timer -= delta;
+        self.stuck_in_state_timer = self.stuck_in_state_timer.max(0.0);
 
         match self.movement_state {
             MajorMoveState::Grounded(_) => self.coyote_timer = 0.25,
             MajorMoveState::Airborne(_) => {}
         }
+    }
+
+    fn transition(&mut self, new_state: MajorMoveState) -> Result<MajorMoveState, MajorMoveState> {
+        if self.stuck_in_state_timer > 0.0 {
+            return Err(new_state);
+        }
+
+        self.movement_state = new_state;
+
+        Ok(self.movement_state.clone())
     }
 
     fn set_y_0(&self) -> bool {

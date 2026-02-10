@@ -115,7 +115,7 @@ fn move_camera(
             continue;
         };
         let top_of_player = player_transform.translation;
-        let top_of_player = top_of_player + Vec3::Y * super::PLAYER_HEIGHT/2.0;
+        let top_of_player = top_of_player + Vec3::Y * super::PLAYER_HEIGHT / 2.0;
 
         let cast = spatial_query.cast_ray(
             top_of_player,
@@ -137,7 +137,6 @@ fn move_camera(
         );
     }
 }
-
 
 const CAMERA_DISTANCE: f32 = 5.0;
 fn unstuck_camera(

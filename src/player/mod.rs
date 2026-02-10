@@ -27,8 +27,9 @@ impl Plugin for PlayerPlugin {
                 player_check_floor,
                 player_reset_y_vel,
                 player_slide,
-                (player_gravity, player_movement),
-                player_rotation,
+                (player_gravity, player_movement,),
+                player_jump,
+                (player_rotation, player_tick_machine),
             )
                 .chain()
                 .after(PhysicsSystems::Last),),
@@ -91,16 +92,19 @@ fn player_slide(
                 // Slide if you can
                 MinorGroundState::Moving | MinorGroundState::Crouched => {
                     if velocity.length() > 7.5 && input.pressed(&PlayerInput::Crouch) {
-                        state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
+                        let _ =
+                            state.transition(MajorMoveState::Grounded(MinorGroundState::Sliding));
                     }
                     if body.force_slide {
-                        state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
+                        let _ =
+                            state.transition(MajorMoveState::Grounded(MinorGroundState::Sliding));
                     }
                 }
                 // Check if it can still slide
                 MinorGroundState::Sliding => {
                     if velocity.length() < 5.0 || !input.pressed(&PlayerInput::Crouch) {
-                        state.movement_state = MajorMoveState::Grounded(MinorGroundState::Moving);
+                        let _ =
+                            state.transition(MajorMoveState::Grounded(MinorGroundState::Moving));
                     }
                 }
             },
@@ -165,11 +169,11 @@ fn player_movement(
 fn player_check_floor(players: Query<(&mut StateMachine, &CharacterBody)>) {
     for (mut machine, body) in players {
         if machine.is_grounded() && !body.grounded {
-            machine.movement_state = MajorMoveState::Airborne(MinorAirborneState::Falling);
+            let _ = machine.transition(MajorMoveState::Airborne(MinorAirborneState::Falling));
         }
 
         if !machine.is_grounded() && body.grounded {
-            machine.movement_state = MajorMoveState::Grounded(MinorGroundState::Moving);
+            let _ = machine.transition(MajorMoveState::Grounded(MinorGroundState::Moving));
         }
     }
 }
@@ -190,6 +194,8 @@ fn player_gravity(players: Query<(&mut LinearVelocity, &StateMachine)>, time: Re
     }
 }
 
+fn player_jump() {}
+
 fn player_rotation(players: Query<(&mut Transform, &LinearVelocity)>) {
     for (mut transform, velocity) in players {
         let flat_vel = velocity.xz();
@@ -201,5 +207,11 @@ fn player_rotation(players: Query<(&mut Transform, &LinearVelocity)>) {
         let angle = Vec2::Y.angle_to(flat_vel);
 
         transform.rotation = Quat::from_euler(EulerRot::YXZ, -angle, 0.0, 0.0);
+    }
+}
+
+fn player_tick_machine(players: Query<&mut StateMachine>, time: Res<Time>) {
+    for mut state in players {
+        state.tick(*time);
     }
 }
