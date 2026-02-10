@@ -28,10 +28,24 @@ fn main() {
     app.run();
 }
 
-fn test_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn test_setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
     commands.spawn(SceneRoot(
         asset_server.load(GltfAssetLabel::Scene(0).from_asset("test_level.glb")),
     ));
+
+    let mesh = meshes.add(Rectangle::from_length(1.0));
+    let material = StandardMaterial {
+        base_color: bevy::color::palettes::basic::WHITE.into(),
+        base_color_texture: Some(asset_server.load("miserere_full.png")),
+        cull_mode: None,
+        ..Default::default()
+    };
+    let material = materials.add(material);
 
     let player_cam_transform = Transform::from_xyz(0.0, 10.5, 0.0);
 
@@ -41,6 +55,8 @@ fn test_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             player::PlayerCharacterMarker,
             input::PlayerInput::default_input_map(),
             player_cam_transform.clone(),
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
         ))
         .id();
 

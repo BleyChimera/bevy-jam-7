@@ -103,6 +103,7 @@ fn update_camera_direction(
     }
 }
 
+const PREDICTED_TIME: f32 = 0.1;
 fn move_camera(
     query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
     mut players: Query<(&Transform, &LinearVelocity), With<PlayerCharacterMarker>>,
@@ -114,12 +115,12 @@ fn move_camera(
             continue;
         };
         let top_of_player = player_transform.translation;
-        let top_of_player = top_of_player + Vec3::Y * 0.5;
+        let top_of_player = top_of_player + Vec3::Y * super::PLAYER_HEIGHT/2.0;
 
         let cast = spatial_query.cast_ray(
             top_of_player,
             Dir3::new(velocity.0).unwrap_or(Dir3::Y),
-            (velocity.0 / 4.0).length(),
+            (velocity.0 * PREDICTED_TIME).length(),
             false,
             &SpatialQueryFilter::from_excluded_entities([pivot.0]),
         );
@@ -127,7 +128,7 @@ fn move_camera(
         let target_point = if let Some(cast) = cast {
             top_of_player + velocity.0.normalize_or_zero() * cast.distance
         } else {
-            top_of_player + velocity.0 / 4.0
+            top_of_player + velocity.0 * PREDICTED_TIME
         };
 
         transform.translation = transform.translation.move_towards(
@@ -137,6 +138,8 @@ fn move_camera(
     }
 }
 
+
+const CAMERA_DISTANCE: f32 = 5.0;
 fn unstuck_camera(
     pivots: Query<(&Transform, &CameraPivot)>,
     cameras: Query<(&mut Transform, &ChildOf), Without<CameraPivot>>,
@@ -154,7 +157,7 @@ fn unstuck_camera(
             Quat::IDENTITY,
             Dir3::new(pivot_transform.rotation * Vec3::Z).unwrap(),
             &ShapeCastConfig {
-                max_distance: 10.0,
+                max_distance: CAMERA_DISTANCE,
                 target_distance: 0.0,
                 compute_contact_on_penetration: true,
                 ignore_origin_penetration: true,
@@ -165,7 +168,7 @@ fn unstuck_camera(
         if let Some(cast) = cast {
             transform.translation.z = cast.distance;
         } else {
-            transform.translation.z = 10.0;
+            transform.translation.z = CAMERA_DISTANCE;
         }
     }
 }

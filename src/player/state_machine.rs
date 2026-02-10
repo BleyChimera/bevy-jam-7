@@ -57,6 +57,8 @@ pub trait PlayerStateMachine {
     /// Can the player enter a jumpin state?
     fn can_jump(&self) -> JumpPossibility;
 
+    fn tick(&mut self, time: Time) -> () {}
+
     /// Check if machine is in a state where the y of the velocity should be 0.0
     fn set_y_0(&self) -> bool;
 
@@ -97,6 +99,16 @@ impl PlayerStateMachine for StateMachine {
                 | MinorAirborneState::CrouchJump
                 | MinorAirborneState::Glide => return JumpPossibility::No,
             },
+        }
+    }
+
+    fn tick(&mut self, time: Time) -> () {
+        let delta = time.delta_secs();
+        self.coyote_timer -= delta;
+
+        match self.movement_state {
+            MajorMoveState::Grounded(_) => self.coyote_timer = 0.25,
+            MajorMoveState::Airborne(_) => {}
         }
     }
 

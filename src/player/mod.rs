@@ -10,6 +10,9 @@ use state_machine::*;
 pub mod camera;
 pub mod state_machine;
 
+pub const PLAYER_HEIGHT: f32 = 1.0;
+pub const PLAYER_THICKNESS: f32 = 0.2;
+
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
@@ -25,6 +28,7 @@ impl Plugin for PlayerPlugin {
                 player_reset_y_vel,
                 player_slide,
                 (player_gravity, player_movement),
+                player_rotation,
             )
                 .chain()
                 .after(PhysicsSystems::Last),),
@@ -42,7 +46,7 @@ impl Plugin for PlayerPlugin {
             force_slide: false,
         },
         CharacterGroundSnap { distance: 0.5 },
-        Collider::capsule(0.2, 0.8),
+        Collider::capsule(PLAYER_THICKNESS, PLAYER_HEIGHT-2.0*PLAYER_THICKNESS),
         PlayerMarker,
         PlayerLookDirection,
         StateMachine,
@@ -183,5 +187,19 @@ fn player_gravity(players: Query<(&mut LinearVelocity, &StateMachine)>, time: Re
         if velocity.y < -terminal_velocity {
             velocity.y = -terminal_velocity;
         }
+    }
+}
+
+fn player_rotation(players: Query<(&mut Transform, &LinearVelocity)>) {
+    for (mut transform, velocity) in players {
+        let flat_vel = velocity.xz();
+
+        if flat_vel.length_squared() <= 1.0 {
+            continue;
+        }
+
+        let angle = Vec2::Y.angle_to(flat_vel);
+
+        transform.rotation = Quat::from_euler(EulerRot::YXZ, -angle, 0.0, 0.0);
     }
 }
