@@ -45,7 +45,7 @@ fn test_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         .id();
 
     commands.spawn((
-        player::CameraPivot(player),
+        player::camera::CameraPivot(player),
         player_cam_transform,
         children![(Camera3d::default(), Transform::from_xyz(0.0, 0.0, 10.0))],
     ));
