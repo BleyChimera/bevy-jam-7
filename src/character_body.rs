@@ -100,12 +100,12 @@ fn character_body_snap(
         &mut CharacterBody,
         &Collider,
         &mut Transform,
-        &mut LinearVelocity,
+        &LinearVelocity,
         &CharacterGroundSnap,
     )>,
     force_slide: Query<&ForceSlide>,
 ) {
-    for (entity, mut body, collider, mut transform, mut velocity, snap) in bodies.into_iter() {
+    for (entity, mut body, collider, mut transform, velocity, snap) in bodies.into_iter() {
         // TODO: ADD VELOCITY DEPENDANT SNAPPING
         let _ = velocity;
 

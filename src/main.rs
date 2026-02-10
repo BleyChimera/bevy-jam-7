@@ -32,7 +32,7 @@ fn test_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(SceneRoot(
         asset_server.load(GltfAssetLabel::Scene(0).from_asset("test_level.glb")),
     ));
-    
+
     let player_cam_transform = Transform::from_xyz(0.0, 10.5, 0.0);
 
     let player = commands

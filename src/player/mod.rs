@@ -20,7 +20,11 @@ impl Plugin for PlayerPlugin {
 
         app.add_systems(
             Update,
-            ((rotate_camera_manual, move_camera), unstuck_camera).chain(),
+            (
+                (rotate_camera_manual, rotate_camera_auto, move_camera),
+                (update_camera_direction, unstuck_camera),
+            )
+                .chain(),
         );
 
         app.add_systems(
@@ -70,14 +74,11 @@ pub struct CameraPivot(pub Entity);
 
 fn rotate_camera_manual(
     query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
-    mut players: Query<
-        (&mut PlayerLookDirection, &ActionState<PlayerInput>),
-        With<PlayerCharacterMarker>,
-    >,
+    mut players: Query<&ActionState<PlayerInput>, With<PlayerCharacterMarker>>,
     time: Res<Time>,
 ) {
     for (mut transform, pivot) in query {
-        let Ok((mut direction, input)) = players.get_mut(pivot.0) else {
+        let Ok(input) = players.get_mut(pivot.0) else {
             continue;
         };
 
@@ -95,8 +96,57 @@ fn rotate_camera_manual(
 
         transform.rotate_local_x(diff);
         transform.rotate_y(-camera_movement.x);
+    }
+}
 
-        direction.0 = transform.rotation * Vec3::Z;
+fn rotate_camera_auto(
+    query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
+    mut players: Query<(&ActionState<PlayerInput>, &LinearVelocity), With<PlayerCharacterMarker>>,
+    time: Res<Time>,
+) {
+    for (mut transform, pivot) in query {
+        let Ok((input, velocity)) = players.get_mut(pivot.0) else {
+            continue;
+        };
+
+        let camera_input = input.axis_pair(&PlayerInput::Camera);
+
+        // If camera is being pushed by player don't try to sway it
+        if camera_input.length_squared() > 0.25 {
+            continue;
+        }
+
+        let flat_velocity = velocity.xz();
+
+        // Get direction to point into
+        let Some(flat_dir) = flat_velocity.try_normalize() else {
+            continue;
+        };
+
+        let point_direction = (transform.rotation * Vec3::NEG_Z).xz().normalize_or_zero();
+
+        let mut angle_diff = point_direction.angle_to(flat_dir);
+
+        if angle_diff.abs() > std::f32::consts::PI - 0.0001 {
+            angle_diff = angle_diff * 0.0;
+        } else if angle_diff.abs() > std::f32::consts::PI / 2.0 {
+            angle_diff = angle_diff * 0.1;
+        }
+
+        transform.rotate_y(-angle_diff * time.delta_secs());
+    }
+}
+
+fn update_camera_direction(
+    query: Query<(&Transform, &CameraPivot)>,
+    mut players: Query<&mut PlayerLookDirection, With<PlayerCharacterMarker>>,
+) {
+    for (transform, pivot) in query {
+        let Ok(mut direction) = players.get_mut(pivot.0) else {
+            continue;
+        };
+
+        direction.0 = transform.rotation * Vec3::NEG_Z;
     }
 }
 
@@ -150,7 +200,12 @@ fn unstuck_camera(
             pivot_transform.translation,
             Quat::IDENTITY,
             Dir3::new(pivot_transform.rotation * Vec3::Z).unwrap(),
-            &ShapeCastConfig {max_distance: 10.0, target_distance:0.0, compute_contact_on_penetration: true, ignore_origin_penetration: true,},
+            &ShapeCastConfig {
+                max_distance: 10.0,
+                target_distance: 0.0,
+                compute_contact_on_penetration: true,
+                ignore_origin_penetration: true,
+            },
             &SpatialQueryFilter::from_excluded_entities([pivot.0]),
         );
 
@@ -227,11 +282,11 @@ fn player_movement(
 
         input_direction = input_direction
             .rotate(*look_dir)
-            .rotate(Vec2::from_angle(-std::f32::consts::PI / 2.0));
+            .rotate(Vec2::from_angle(std::f32::consts::PI / 2.0));
 
         let flat_velocity = velocity.xz();
 
-        if velocity.length() > movement_stats.max_speed * 1.01
+        if flat_velocity.length() > movement_stats.max_speed * 1.01
             && input_direction.length_squared() > 0.01
         {
             if input_direction.length_squared() > 0.01 {
