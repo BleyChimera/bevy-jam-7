@@ -40,9 +40,9 @@ fn test_setup(
 
     let mesh = meshes.add(Rectangle::from_length(1.0));
     let material = StandardMaterial {
-        base_color: bevy::color::palettes::basic::WHITE.into(),
         base_color_texture: Some(asset_server.load("miserere_full.png")),
         cull_mode: None,
+        unlit: true,
         ..Default::default()
     };
     let material = materials.add(material);
