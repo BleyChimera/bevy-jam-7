@@ -57,6 +57,7 @@ fn test_setup(
             player_cam_transform.clone(),
             Mesh3d(mesh),
             MeshMaterial3d(material),
+            SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("miserere.glb")),),
         ))
         .id();
 
