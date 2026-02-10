@@ -7,7 +7,7 @@ impl Plugin for StateMachinePlugin {
     }
 }
 
-#[derive(Component, Reflect, Clone, Copy, Default)]
+#[derive(Component, Reflect, Clone, Default)]
 #[reflect(Component)]
 pub struct StateMachine {
     pub movement_state: MajorMoveState,
@@ -15,7 +15,7 @@ pub struct StateMachine {
     stuck_in_state_timer: f32,
 }
 
-#[derive(Reflect, Clone, Copy)]
+#[derive(Reflect, Clone)]
 pub enum MajorMoveState {
     Grounded(MinorGroundState),
     Airborne(MinorAirborneState),
@@ -27,7 +27,7 @@ impl Default for MajorMoveState {
     }
 }
 
-#[derive(Clone, Copy, Default, Reflect)]
+#[derive(Clone, Default, Reflect)]
 pub enum MinorGroundState {
     #[default]
     Moving,
@@ -35,20 +35,26 @@ pub enum MinorGroundState {
     Crouched,
 }
 
-#[derive(Clone, Copy, Default, Reflect)]
+#[derive(Clone, Default, Reflect)]
 pub enum MinorAirborneState {
     #[default]
     Falling,
-    Jumping,
-    CrouchJump,
-    DiveJump,
+    Jumping(JumpType),
     Dive,
     Glide,
 }
 
+#[derive(Clone, Copy, Reflect)]
+/// Internal f32 to count how much time left there is on the jump
+pub enum JumpType {
+    Normal(f32),
+    Crouch(f32),
+    Dive(f32),
+}
+
 pub trait PlayerStateMachine {
     /// Try to get into a jumping state and return the new state
-    fn jump(&mut self) -> MajorMoveState;
+    fn jump(&mut self) -> Result<MajorMoveState, MajorMoveState>;
 
     /// Transition to a new state unless stuck. Returns Ok(Old state) Err(New state)
     fn transition(&mut self, new_state: MajorMoveState) -> Result<MajorMoveState, MajorMoveState>;
@@ -67,6 +73,9 @@ pub trait PlayerStateMachine {
 
     /// Gravity in format (gravity_up, gravity_down, terminal_velocity)
     fn gravity(&self) -> (f32, f32, f32);
+
+    /// Get the jump strength of the jump type
+    fn jump_strength(&self) -> f32;
 }
 
 pub struct MovementStats {
@@ -78,38 +87,50 @@ pub struct MovementStats {
     pub rotation_rate: f32,
 }
 
+const MAX_JUMP_LENGTH: f32 = 0.2;
+const MAX_CROUCH_JUMP_LENGTH: f32 = 0.3;
+const MAX_DIVE_JUMP_LENGTH: f32 = 0.0;
+
 impl PlayerStateMachine for StateMachine {
-    fn jump(&mut self) -> MajorMoveState {
-        let result;
-        
-        match self.movement_state {
+    fn jump(&mut self) -> Result<MajorMoveState, MajorMoveState> {
+        match &self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
                 MinorGroundState::Moving | MinorGroundState::Sliding => {
-                    result = self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping));
+                    return self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping(
+                        JumpType::Normal(MAX_JUMP_LENGTH),
+                    )));
                 }
                 MinorGroundState::Crouched => {
-                    result =
-                        self.transition(MajorMoveState::Airborne(MinorAirborneState::CrouchJump));
+                    return self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping(
+                        JumpType::Crouch(MAX_CROUCH_JUMP_LENGTH),
+                    )));
                 }
             },
             MajorMoveState::Airborne(substate) => match substate {
                 MinorAirborneState::Dive => {
-                    result = self.transition(MajorMoveState::Airborne(MinorAirborneState::DiveJump));
+                    return self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping(
+                        JumpType::Dive(MAX_DIVE_JUMP_LENGTH),
+                    )));
                 }
-                MinorAirborneState::Jumping
-                | MinorAirborneState::DiveJump
-                | MinorAirborneState::Falling
-                | MinorAirborneState::CrouchJump
-                | MinorAirborneState::Glide => {
-                    if self.coyote_timer > 0.0 {
-                        result =
-                            self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping));
+                MinorAirborneState::Jumping(jump_type) => {
+                    return Ok(MajorMoveState::Airborne(MinorAirborneState::Jumping(
+                        jump_type.clone(),
+                    )));
+                }
+                MinorAirborneState::Falling | MinorAirborneState::Glide => {
+                    if self.coyote_timer > f32::EPSILON {
+                        if let Ok(_) = self.transition(MajorMoveState::Airborne(
+                            MinorAirborneState::Jumping(JumpType::Normal(MAX_JUMP_LENGTH)),
+                        )) {
+                            self.coyote_timer = 0.0;
+                            return Ok(self.movement_state.clone());
+                        }
                     }
                 }
             },
         }
 
-        return self.movement_state.clone();
+        return Err(self.movement_state.clone());
     }
 
     fn tick(&mut self, time: Time) -> () {
@@ -138,7 +159,7 @@ impl PlayerStateMachine for StateMachine {
     }
 
     fn set_y_0(&self) -> bool {
-        match self.movement_state {
+        match &self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
                 MinorGroundState::Moving => true,
                 MinorGroundState::Sliding => false,
@@ -156,7 +177,7 @@ impl PlayerStateMachine for StateMachine {
     }
 
     fn movement_stats(&self) -> MovementStats {
-        match self.movement_state {
+        match &self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
                 MinorGroundState::Moving => {
                     return MovementStats {
@@ -181,16 +202,20 @@ impl PlayerStateMachine for StateMachine {
                 }
             },
             MajorMoveState::Airborne(substate) => match substate {
-                MinorAirborneState::Falling => {
+                MinorAirborneState::Falling | MinorAirborneState::Jumping(_) => {
                     return MovementStats {
                         max_speed: 10.0,
                         acceleration: 10.0,
                         rotation_rate: 0.0,
                     };
                 }
-                MinorAirborneState::Jumping => todo!(),
-                MinorAirborneState::CrouchJump => todo!(),
-                MinorAirborneState::Glide => todo!(),
+                MinorAirborneState::Glide => {
+                    return MovementStats {
+                        max_speed: 5.0,
+                        acceleration: 10.0,
+                        rotation_rate: 0.0,
+                    };
+                }
                 MinorAirborneState::Dive => {
                     return MovementStats {
                         max_speed: 10.0,
@@ -203,19 +228,34 @@ impl PlayerStateMachine for StateMachine {
     }
 
     fn gravity(&self) -> (f32, f32, f32) {
-        match self.movement_state {
+        match &self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
-                MinorGroundState::Moving => return (0.0, 0.0, 0.0),
+                MinorGroundState::Moving | MinorGroundState::Crouched => return (0.0, 0.0, 0.0),
                 MinorGroundState::Sliding => return (60.0, 60.0, f32::INFINITY),
-                MinorGroundState::Crouched => return (20.0, 20.0, f32::INFINITY),
             },
             MajorMoveState::Airborne(substate) => match substate {
-                MinorAirborneState::Falling
-                | MinorAirborneState::Jumping
-                | MinorAirborneState::CrouchJump => return (10.0, 15.0, 15.0),
+                MinorAirborneState::Jumping(_) => {
+                    return (0.0, 0.0, 1.0);
+                }
+                MinorAirborneState::Falling => return (15.0, 25.0, 20.0),
                 MinorAirborneState::Glide => return (1.0, 1.0, 5.0),
                 MinorAirborneState::Dive => return (40.0, 160.0, 40.0),
             },
         }
+    }
+
+    fn jump_strength(&self) -> f32 {
+        match &self.movement_state {
+            MajorMoveState::Airborne(substate) => match substate {
+                MinorAirborneState::Jumping(jump_type) => match jump_type {
+                    JumpType::Normal(_) => return 10.0,
+                    JumpType::Crouch(_) => return 15.0,
+                    JumpType::Dive(_) => return 5.0,
+                },
+                _ => {}
+            },
+            _ => {}
+        }
+        return 0.0;
     }
 }

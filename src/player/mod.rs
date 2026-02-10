@@ -26,8 +26,8 @@ impl Plugin for PlayerPlugin {
             ((
                 player_check_floor,
                 player_reset_y_vel,
-                player_slide,
-                (player_gravity, player_movement,),
+                player_slide_and_crouch,
+                (player_gravity, player_movement),
                 player_jump,
                 (player_rotation, player_tick_machine),
             )
@@ -72,7 +72,10 @@ fn player_reset_y_vel(players: Query<(&mut LinearVelocity, &StateMachine)>, time
     }
 }
 
-fn player_slide(
+const MIN_SLIDE_VEL: f32 = 7.5;
+const MAX_SLIDE_VEL: f32 = 7.5;
+
+fn player_slide_and_crouch(
     players: Query<(
         &mut StateMachine,
         &LinearVelocity,
@@ -83,26 +86,37 @@ fn player_slide(
     for (mut state, velocity, input, body) in players {
         // Return early if slide is forced
         if body.force_slide && state.is_grounded() && velocity.length_squared() > 0.001 {
-            state.movement_state = MajorMoveState::Grounded(MinorGroundState::Sliding);
+            let _ = state.transition(MajorMoveState::Grounded(MinorGroundState::Sliding));
             continue;
         }
 
-        match state.movement_state {
+        match &state.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
                 // Slide if you can
-                MinorGroundState::Moving | MinorGroundState::Crouched => {
-                    if velocity.length() > 7.5 && input.pressed(&PlayerInput::Crouch) {
+                MinorGroundState::Moving => {
+                    if input.pressed(&PlayerInput::Crouch) {
+                        if velocity.length() > MIN_SLIDE_VEL {
+                            let _ = state
+                                .transition(MajorMoveState::Grounded(MinorGroundState::Sliding));
+                        } else {
+                            let _ = state
+                                .transition(MajorMoveState::Grounded(MinorGroundState::Crouched));
+                        }
+                    }
+                }
+                MinorGroundState::Crouched => {
+                    if !input.pressed(&PlayerInput::Crouch) {
                         let _ =
                             state.transition(MajorMoveState::Grounded(MinorGroundState::Sliding));
                     }
-                    if body.force_slide {
+                    if velocity.length() > MIN_SLIDE_VEL {
                         let _ =
                             state.transition(MajorMoveState::Grounded(MinorGroundState::Sliding));
                     }
                 }
                 // Check if it can still slide
                 MinorGroundState::Sliding => {
-                    if velocity.length() < 5.0 || !input.pressed(&PlayerInput::Crouch) {
+                    if velocity.length() < MAX_SLIDE_VEL || !input.pressed(&PlayerInput::Crouch) {
                         let _ =
                             state.transition(MajorMoveState::Grounded(MinorGroundState::Moving));
                     }
@@ -194,7 +208,66 @@ fn player_gravity(players: Query<(&mut LinearVelocity, &StateMachine)>, time: Re
     }
 }
 
-fn player_jump() {}
+fn player_jump(
+    players: Query<(
+        &mut LinearVelocity,
+        &mut StateMachine,
+        &mut CharacterBody,
+        &ActionState<PlayerInput>,
+    )>,
+    time: Res<Time>,
+) {
+    for (mut velocity, mut state, mut body, input) in players {
+        let mut stop_jump = false;
+
+        if input.pressed(&PlayerInput::Jump) {
+            let final_state = state.jump();
+
+            if final_state.is_ok() {
+                body.grounded = false;
+                velocity.y = state.jump_strength();
+            }
+        } else {
+            stop_jump = true;
+        }
+
+        if velocity.y < 0.0 {
+            stop_jump = true;
+        }
+
+        match &mut state.movement_state {
+            MajorMoveState::Grounded(_) => {}
+            MajorMoveState::Airborne(substate) => match substate {
+                MinorAirborneState::Jumping(jump_type) => match jump_type {
+                    JumpType::Normal(time_left)
+                    | JumpType::Dive(time_left)
+                    | JumpType::Crouch(time_left) => {
+                        *time_left -= time.delta_secs();
+
+                        if *time_left <= 0.0 {
+                            stop_jump = true;
+                        }
+                    }
+                },
+
+                _ => {}
+            },
+        }
+
+        if stop_jump {
+            match &state.movement_state {
+                MajorMoveState::Grounded(_) => {}
+                MajorMoveState::Airborne(substate) => match substate {
+                    MinorAirborneState::Jumping(_) => {
+                        let _ =
+                            state.transition(MajorMoveState::Airborne(MinorAirborneState::Falling));
+                    }
+                    _ => {}
+                },
+            }
+        }
+    }
+}
 
 fn player_rotation(players: Query<(&mut Transform, &LinearVelocity)>) {
     for (mut transform, velocity) in players {
