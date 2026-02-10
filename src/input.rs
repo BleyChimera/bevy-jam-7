@@ -14,6 +14,7 @@ pub enum PlayerInput {
     Camera,
     Jump,
     Crouch,
+    Attack,
 }
 
 impl Actionlike for PlayerInput {
@@ -23,6 +24,7 @@ impl Actionlike for PlayerInput {
             PlayerInput::Camera => InputControlKind::DualAxis,
             PlayerInput::Jump => InputControlKind::Button,
             PlayerInput::Crouch => InputControlKind::Button,
+            PlayerInput::Attack => InputControlKind::Button,
         }
     }
 }
