@@ -156,6 +156,8 @@ fn get_animation_target(
     }
 }
 
+
+// TODO: MOVE ANIMATION RELATED THINGS TO PLAYER MODULE
 fn test_animation(
     player_model: Res<MiserereModel>,
     players: Query<(&player::state_machine::StateMachine, &LinearVelocity)>,
@@ -215,18 +217,27 @@ fn test_animation(
 
                     animation.play(slide_start.clone()).set_weight(1.0);
 
-                    info!("{:?}", animation.is_playing_animation(slide_start.clone()));
-
-                    animation
-                        .play(
-                            player_model
-                                .animation_nodes
-                                .get(&slide_name)
-                                .unwrap()
-                                .clone(),
-                        )
-                        .set_weight(1.0)
-                        .repeat();
+                    let mut play_slide = false;
+                    'check: for (node, animation_clip) in animation.playing_animations() {
+                        if node == slide_start {
+                            if animation_clip.is_finished() {
+                                play_slide = true;
+                                break 'check;
+                            }
+                        }
+                    }
+                    if play_slide {
+                        animation
+                            .play(
+                                player_model
+                                    .animation_nodes
+                                    .get(&slide_name)
+                                    .unwrap()
+                                    .clone(),
+                            )
+                            .set_weight(1.0)
+                            .repeat();
+                    }
                 }
                 player::state_machine::MinorGroundState::Crouched => {
                     stop_all_animations_but(&[&crouch_name]);
