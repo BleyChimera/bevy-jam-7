@@ -52,6 +52,7 @@ fn rotate_camera_manual(
     }
 }
 
+const CAMERA_ROTATION_SPEED: f32 = 0.75;
 fn rotate_camera_auto(
     query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
     mut players: Query<(&ActionState<PlayerInput>, &LinearVelocity), With<PlayerCharacterMarker>>,
@@ -86,7 +87,7 @@ fn rotate_camera_auto(
             angle_diff = angle_diff * 0.1;
         }
 
-        transform.rotate_y(-angle_diff * time.delta_secs());
+        transform.rotate_y(-angle_diff * time.delta_secs() * CAMERA_ROTATION_SPEED);
     }
 }
 
@@ -103,7 +104,8 @@ fn update_camera_direction(
     }
 }
 
-const PREDICTED_TIME: f32 = 0.1;
+const PREDICTED_TIME: f32 = 0.2;
+const SPEED_CAMERA: f32 = 10.0;
 fn move_camera(
     query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
     mut players: Query<(&Transform, &LinearVelocity), With<PlayerCharacterMarker>>,
@@ -133,7 +135,7 @@ fn move_camera(
 
         transform.translation = transform.translation.move_towards(
             target_point,
-            time.delta_secs() * (transform.translation - target_point).length() * 15.0,
+            time.delta_secs() * (transform.translation - target_point).length() * SPEED_CAMERA,
         );
     }
 }
