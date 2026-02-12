@@ -95,12 +95,12 @@ impl PlayerStateMachine for StateMachine {
     fn jump(&mut self) -> Result<MajorMoveState, MajorMoveState> {
         match &self.movement_state {
             MajorMoveState::Grounded(substate) => match substate {
-                MinorGroundState::Moving | MinorGroundState::Sliding => {
+                MinorGroundState::Moving => {
                     return self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping(
                         JumpType::Normal(MAX_JUMP_LENGTH),
                     )));
                 }
-                MinorGroundState::Crouched => {
+                MinorGroundState::Crouched | MinorGroundState::Sliding => {
                     return self.transition(MajorMoveState::Airborne(MinorAirborneState::Jumping(
                         JumpType::Crouch(MAX_CROUCH_JUMP_LENGTH),
                     )));
@@ -248,9 +248,9 @@ impl PlayerStateMachine for StateMachine {
         match &self.movement_state {
             MajorMoveState::Airborne(substate) => match substate {
                 MinorAirborneState::Jumping(jump_type) => match jump_type {
-                    JumpType::Normal(_) => return 10.0,
-                    JumpType::Crouch(_) => return 15.0,
-                    JumpType::Dive(_) => return 5.0,
+                    JumpType::Normal(_) => return 5.0,
+                    JumpType::Crouch(_) => return 7.0,
+                    JumpType::Dive(_) => return 1.0,
                 },
                 _ => {}
             },

@@ -107,7 +107,7 @@ fn player_slide_and_crouch(
                 MinorGroundState::Crouched => {
                     if !input.pressed(&PlayerInput::Crouch) {
                         let _ =
-                            state.transition(MajorMoveState::Grounded(MinorGroundState::Sliding));
+                            state.transition(MajorMoveState::Grounded(MinorGroundState::Moving));
                     }
                     if velocity.length() > MIN_SLIDE_VEL {
                         let _ =

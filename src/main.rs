@@ -156,18 +156,28 @@ fn get_animation_target(
     }
 }
 
-
 // TODO: MOVE ANIMATION RELATED THINGS TO PLAYER MODULE
 fn test_animation(
     player_model: Res<MiserereModel>,
     players: Query<(&player::state_machine::StateMachine, &LinearVelocity)>,
     animations: Query<(&MiserereAnimationsConnector, &mut AnimationPlayer)>,
+    time: Res<Time>,
 ) {
     let idle_name = "Idle".to_string();
     let walk_name = "Walk".to_string();
     let slide_start = "SlideStart".to_string();
     let slide_name = "Slide".to_string();
-    let crouch_name = "Idle".to_string();
+    let crouch_start = "CrouchStart".to_string();
+    let crouch_name = "Crouch".to_string();
+
+    let glide_name = "Glide".to_string();
+    let dive_name = "Dive".to_string();
+    let air_up_name = "AirUp".to_string();
+    let air_down_name = "AirDown".to_string();
+
+    let jump_normal_name = "JumpNormal".to_string();
+    let jump_crouch_name = "JumpCrouch".to_string();
+    let jump_dive_name = "JumpDive".to_string();
 
     for (connector, mut animation) in animations {
         let mut stop_all_animations_but = |exceptions: &[&String]| {
@@ -240,35 +250,174 @@ fn test_animation(
                     }
                 }
                 player::state_machine::MinorGroundState::Crouched => {
-                    stop_all_animations_but(&[&crouch_name]);
+                    stop_all_animations_but(&[&crouch_start, &crouch_name]);
+
+                    let crouch_start = player_model.animation_nodes.get(&crouch_start).unwrap();
+
+                    animation.play(crouch_start.clone()).set_weight(1.0);
+
+                    let mut play_slide = false;
+                    'check: for (node, animation_clip) in animation.playing_animations() {
+                        if node == crouch_start {
+                            if animation_clip.is_finished() {
+                                play_slide = true;
+                                break 'check;
+                            }
+                        }
+                    }
+                    if play_slide {
+                        animation
+                            .play(
+                                player_model
+                                    .animation_nodes
+                                    .get(&crouch_name)
+                                    .unwrap()
+                                    .clone(),
+                            )
+                            .set_weight(1.0)
+                            .repeat();
+                    }
+                }
+            },
+            player::state_machine::MajorMoveState::Airborne(substate) => match substate {
+                player::state_machine::MinorAirborneState::Jumping(jump_type) => match jump_type {
+                    player::state_machine::JumpType::Normal(_) => {
+                        stop_all_animations_but(&[&jump_normal_name]);
+
+                        animation
+                            .play(
+                                player_model
+                                    .animation_nodes
+                                    .get(&jump_normal_name)
+                                    .unwrap()
+                                    .clone(),
+                            )
+                            .set_weight(1.0);
+                    }
+                    player::state_machine::JumpType::Crouch(_) => {
+                        stop_all_animations_but(&[&jump_crouch_name]);
+
+                        animation
+                            .play(
+                                player_model
+                                    .animation_nodes
+                                    .get(&jump_crouch_name)
+                                    .unwrap()
+                                    .clone(),
+                            )
+                            .set_weight(1.0);
+                    }
+                    player::state_machine::JumpType::Dive(_) => {
+                        stop_all_animations_but(&[&jump_dive_name]);
+
+                        animation
+                            .play(
+                                player_model
+                                    .animation_nodes
+                                    .get(&jump_dive_name)
+                                    .unwrap()
+                                    .clone(),
+                            )
+                            .set_weight(1.0);
+                    }
+                },
+                player::state_machine::MinorAirborneState::Glide => {
+                    stop_all_animations_but(&[&glide_name]);
 
                     animation
                         .play(
                             player_model
                                 .animation_nodes
-                                .get(&crouch_name)
+                                .get(&glide_name)
                                 .unwrap()
                                 .clone(),
                         )
                         .set_weight(1.0)
                         .repeat();
                 }
-            },
-            player::state_machine::MajorMoveState::Airborne(substate) => {
-                match substate {
-                    player::state_machine::MinorAirborneState::Jumping(jump_type) => {
-                        match jump_type {
-                            player::state_machine::JumpType::Normal(_) => {}
-                            player::state_machine::JumpType::Crouch(_) => {}
-                            player::state_machine::JumpType::Dive(_) => {}
+                player::state_machine::MinorAirborneState::Dive => {
+                    stop_all_animations_but(&[&dive_name]);
+
+                    animation
+                        .play(
+                            player_model
+                                .animation_nodes
+                                .get(&dive_name)
+                                .unwrap()
+                                .clone(),
+                        )
+                        .set_weight(1.0);
+                }
+                player::state_machine::MinorAirborneState::Falling => {
+                    stop_all_animations_but(&[
+                        &jump_normal_name,
+                        &jump_dive_name,
+                        &jump_crouch_name,
+                        &air_up_name,
+                        &air_down_name,
+                    ]);
+
+                    let y_factor = velocity.y.clamp(-1.0, 1.0);
+
+                    let mut play_animation = true;
+                    let nodes = [
+                        player_model.animation_nodes.get(&jump_normal_name).unwrap(),
+                        player_model.animation_nodes.get(&jump_dive_name).unwrap(),
+                        player_model.animation_nodes.get(&jump_crouch_name).unwrap(),
+                    ];
+
+                    'search: for (node, animation_clip) in animation.playing_animations_mut() {
+                        for compare in nodes {
+                            if node == compare {
+                                if animation_clip.is_finished() {
+                                    play_animation = true;
+                                    animation_clip.set_weight(
+                                        animation_clip
+                                            .weight()
+                                            .lerp(0.0, time.delta_secs() * 10.0)
+                                            .max(0.0),
+                                    );
+                                    break 'search;
+                                } else {
+                                    play_animation = false;
+                                }
+                            }
                         }
                     }
-                    player::state_machine::MinorAirborneState::Glide => {}
-                    player::state_machine::MinorAirborneState::Dive => {}
-                    player::state_machine::MinorAirborneState::Falling => {}
+
+                    if play_animation {
+                        let air_up = animation
+                            .play(
+                                player_model
+                                    .animation_nodes
+                                    .get(&air_up_name)
+                                    .unwrap()
+                                    .clone(),
+                            )
+                            .repeat();
+                        air_up.set_weight(
+                            air_up
+                                .weight()
+                                .lerp(y_factor.max(0.0), time.delta_secs().max(y_factor.max(0.0))),
+                        );
+
+                        let air_down = animation
+                            .play(
+                                player_model
+                                    .animation_nodes
+                                    .get(&air_down_name)
+                                    .unwrap()
+                                    .clone(),
+                            )
+                            .repeat();
+
+                        air_down.set_weight(air_down.weight().lerp(
+                            (-y_factor).max(0.0),
+                            time.delta_secs().max((-y_factor).max(0.0)),
+                        ));
+                    }
                 }
-                stop_all_animations_but(&[]);
-            }
+            },
         }
     }
 }

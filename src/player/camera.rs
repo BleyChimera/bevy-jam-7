@@ -52,7 +52,7 @@ fn rotate_camera_manual(
     }
 }
 
-const CAMERA_ROTATION_SPEED: f32 = 0.75;
+const CAMERA_ROTATION_SPEED: f32 = 3.0;
 fn rotate_camera_auto(
     query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
     mut players: Query<(&ActionState<PlayerInput>, &LinearVelocity), With<PlayerCharacterMarker>>,
@@ -81,13 +81,13 @@ fn rotate_camera_auto(
 
         let mut angle_diff = point_direction.angle_to(flat_dir);
 
-        if angle_diff.abs() > std::f32::consts::PI - 0.0001 {
-            angle_diff = angle_diff * 0.0;
-        } else if angle_diff.abs() > std::f32::consts::PI / 2.0 {
-            angle_diff = angle_diff * 0.1;
+        let factor = 1.0 - (angle_diff / (std::f32::consts::PI / 2.0)).abs();
+
+        if angle_diff.abs() >= (std::f32::consts::PI / 2.0) - 0.01 {
+            angle_diff = 0.0;
         }
 
-        transform.rotate_y(-angle_diff * time.delta_secs() * CAMERA_ROTATION_SPEED);
+        transform.rotate_y(-angle_diff * time.delta_secs() * CAMERA_ROTATION_SPEED * factor);
     }
 }
 
@@ -104,8 +104,8 @@ fn update_camera_direction(
     }
 }
 
-const PREDICTED_TIME: f32 = 0.2;
-const SPEED_CAMERA: f32 = 10.0;
+const PREDICTED_TIME: f32 = 0.05;
+const SPEED_CAMERA: f32 = 9.0;
 fn move_camera(
     query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
     mut players: Query<(&Transform, &LinearVelocity), With<PlayerCharacterMarker>>,
@@ -117,7 +117,7 @@ fn move_camera(
             continue;
         };
         let top_of_player = player_transform.translation;
-        let top_of_player = top_of_player + Vec3::Y * super::PLAYER_HEIGHT / 2.0;
+        let top_of_player = top_of_player + Vec3::Y * super::PLAYER_HEIGHT / 4.0;
 
         let cast = spatial_query.cast_ray(
             top_of_player,
@@ -140,7 +140,7 @@ fn move_camera(
     }
 }
 
-const CAMERA_DISTANCE: f32 = 5.0;
+const CAMERA_DISTANCE: f32 = 3.0;
 fn unstuck_camera(
     pivots: Query<(&Transform, &CameraPivot)>,
     cameras: Query<(&mut Transform, &ChildOf), Without<CameraPivot>>,
