@@ -32,9 +32,14 @@ fn main() {
 
     app.add_systems(Startup, (test_setup,));
 
-    app.add_observer(get_animation_target);
-
-    app.add_systems(Update, (load_animations_from_gltf, test_animation));
+    app.add_systems(
+        Update,
+        (
+            load_animations_from_gltf,
+            get_animation_target,
+            test_animation,
+        ),
+    );
 
     app.run();
 }
@@ -103,7 +108,6 @@ fn load_animations_from_gltf(
     mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
     for event in gltf.read() {
-        info!("{:?}", event);
         match event {
             AssetEvent::Added { id } | AssetEvent::LoadedWithDependencies { id } => {
                 if player_model.gltf_handle.id() == *id {
@@ -111,7 +115,6 @@ fn load_animations_from_gltf(
                     for entity in scene_instantiate {
                         commands
                             .entity(entity)
-                            .remove::<MiserereSceneTarget>()
                             .insert((SceneRoot(miserere.scenes.get(0).unwrap().clone()),));
                     }
 
@@ -133,27 +136,47 @@ fn load_animations_from_gltf(
 }
 
 fn get_animation_target(
-    trigger: On<Add, MiserereAnimationTarget>,
     mut commands: Commands,
-    parents: Query<&ChildOf>,
-    players: Query<Entity, With<player::PlayerMarker>>,
+    players: Query<&ChildOf, With<MiserereSceneTarget>>,
+    targets: Query<Entity, With<MiserereAnimationTarget>>,
 ) {
-    let entity = trigger.entity;
-    let player_entity;
+    for player in players {
+        for target in targets {
+            commands
+                .entity(target)
+                .insert(MiserereAnimationsConnector(player.0))
+                .remove::<MiserereAnimationTarget>();
 
-    let mut parent = parents.get(entity).unwrap().0;
-    'search: loop {
-        if let Ok(player) = players.get(parent) {
-            player_entity = player;
-            break 'search;
-        } else {
-            parent = parents.get(parent).unwrap().0;
+            commands.entity(player.0).remove::<MiserereSceneTarget>();
         }
     }
-
-    commands
-        .entity(entity)
-        .insert(MiserereAnimationsConnector(player_entity)).remove::<MiserereAnimationTarget>();
 }
 
-fn test_animation(mut player_model: ResMut<MiserereModel>) {}
+fn test_animation(
+    player_model: Res<MiserereModel>,
+    players: Query<(&player::state_machine::StateMachine, &LinearVelocity)>,
+    animations: Query<(&MiserereAnimationsConnector, &mut AnimationPlayer)>,
+) {
+    for (connector, mut animation) in animations {
+        let Ok((state, velocity)) = players.get(connector.0) else {
+            continue;
+        };
+
+        match &state.movement_state {
+            player::state_machine::MajorMoveState::Grounded(substate) => match substate {
+                player::state_machine::MinorGroundState::Moving => {
+                    let ratio = velocity.length() / 10.0;
+
+                    animation
+                        .play(player_model.animation_nodes.get("Idle").unwrap().clone())
+                        .set_weight(1.0 - ratio);
+                    animation
+                        .play(player_model.animation_nodes.get("Walk").unwrap().clone())
+                        .set_weight(ratio);
+                }
+                _ => {}
+            },
+            player::state_machine::MajorMoveState::Airborne(_) => {}
+        }
+    }
+}
