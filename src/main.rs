@@ -101,9 +101,6 @@ fn load_animations_from_gltf(
     mut player_model: ResMut<MiserereModel>,
     gltfs: Res<Assets<Gltf>>,
     mut graphs: ResMut<Assets<AnimationGraph>>,
-
-    players: Query<Entity, With<player::PlayerMarker>>,
-    parents: Query<&ChildOf>,
 ) {
     for event in gltf.read() {
         info!("{:?}", event);
