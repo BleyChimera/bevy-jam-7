@@ -24,7 +24,7 @@ fn main() {
         bevy_skein::SkeinPlugin::default(),
         PhysicsPlugins::new(FixedUpdate),
         PhysicsDebugPlugin::default(),
-        bevy_seedling::SeedlingPlugin::default(),
+        //bevy_seedling::SeedlingPlugin::default(),
         input::InputPlugin,
         player::PlayerPlugin,
         character_body::CharacterBodyPlugin,
@@ -139,12 +139,16 @@ fn get_animation_target(
     mut commands: Commands,
     players: Query<&ChildOf, With<MiserereSceneTarget>>,
     targets: Query<Entity, With<MiserereAnimationTarget>>,
+    model: Res<MiserereModel>,
 ) {
     for player in players {
         for target in targets {
             commands
                 .entity(target)
-                .insert(MiserereAnimationsConnector(player.0))
+                .insert((
+                    MiserereAnimationsConnector(player.0),
+                    AnimationGraphHandle(model.animation_handle.clone()),
+                ))
                 .remove::<MiserereAnimationTarget>();
 
             commands.entity(player.0).remove::<MiserereSceneTarget>();
@@ -157,7 +161,21 @@ fn test_animation(
     players: Query<(&player::state_machine::StateMachine, &LinearVelocity)>,
     animations: Query<(&MiserereAnimationsConnector, &mut AnimationPlayer)>,
 ) {
+    let idle_name = "Idle".to_string();
+    let walk_name = "Walk".to_string();
+    let slide_start = "SlideStart".to_string();
+    let slide_name = "Slide".to_string();
+    let crouch_name = "Idle".to_string();
+
     for (connector, mut animation) in animations {
+        let mut stop_all_animations_but = |exceptions: &[&String]| {
+            for (name, animation_clip) in player_model.animation_nodes.iter() {
+                if !exceptions.contains(&name) {
+                    animation.stop(animation_clip.clone());
+                }
+            }
+        };
+
         let Ok((state, velocity)) = players.get(connector.0) else {
             continue;
         };
@@ -165,18 +183,81 @@ fn test_animation(
         match &state.movement_state {
             player::state_machine::MajorMoveState::Grounded(substate) => match substate {
                 player::state_machine::MinorGroundState::Moving => {
+                    stop_all_animations_but(&[&idle_name, &walk_name]);
+
                     let ratio = velocity.length() / 10.0;
 
                     animation
-                        .play(player_model.animation_nodes.get("Idle").unwrap().clone())
-                        .set_weight(1.0 - ratio);
+                        .play(
+                            player_model
+                                .animation_nodes
+                                .get(&idle_name)
+                                .unwrap()
+                                .clone(),
+                        )
+                        .set_weight(1.0 - ratio)
+                        .repeat();
                     animation
-                        .play(player_model.animation_nodes.get("Walk").unwrap().clone())
-                        .set_weight(ratio);
+                        .play(
+                            player_model
+                                .animation_nodes
+                                .get(&walk_name)
+                                .unwrap()
+                                .clone(),
+                        )
+                        .set_weight(ratio)
+                        .repeat();
                 }
-                _ => {}
+                player::state_machine::MinorGroundState::Sliding => {
+                    stop_all_animations_but(&[&slide_start, &slide_name]);
+
+                    let slide_start = player_model.animation_nodes.get(&slide_start).unwrap();
+
+                    animation.play(slide_start.clone()).set_weight(1.0);
+
+                    info!("{:?}", animation.is_playing_animation(slide_start.clone()));
+
+                    animation
+                        .play(
+                            player_model
+                                .animation_nodes
+                                .get(&slide_name)
+                                .unwrap()
+                                .clone(),
+                        )
+                        .set_weight(1.0)
+                        .repeat();
+                }
+                player::state_machine::MinorGroundState::Crouched => {
+                    stop_all_animations_but(&[&crouch_name]);
+
+                    animation
+                        .play(
+                            player_model
+                                .animation_nodes
+                                .get(&crouch_name)
+                                .unwrap()
+                                .clone(),
+                        )
+                        .set_weight(1.0)
+                        .repeat();
+                }
             },
-            player::state_machine::MajorMoveState::Airborne(_) => {}
+            player::state_machine::MajorMoveState::Airborne(substate) => {
+                match substate {
+                    player::state_machine::MinorAirborneState::Jumping(jump_type) => {
+                        match jump_type {
+                            player::state_machine::JumpType::Normal(_) => {}
+                            player::state_machine::JumpType::Crouch(_) => {}
+                            player::state_machine::JumpType::Dive(_) => {}
+                        }
+                    }
+                    player::state_machine::MinorAirborneState::Glide => {}
+                    player::state_machine::MinorAirborneState::Dive => {}
+                    player::state_machine::MinorAirborneState::Falling => {}
+                }
+                stop_all_animations_but(&[]);
+            }
         }
     }
 }
