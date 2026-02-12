@@ -29,6 +29,8 @@ impl Plugin for PlayerPlugin {
                 player_slide_and_crouch,
                 (player_gravity, player_movement),
                 player_jump,
+                player_dive,
+                player_glide,
                 (player_rotation, player_tick_machine),
             )
                 .chain()
@@ -265,6 +267,62 @@ fn player_jump(
                     _ => {}
                 },
             }
+        }
+    }
+}
+
+fn player_dive(
+    players: Query<(
+        &mut LinearVelocity,
+        &mut StateMachine,
+        &ActionState<PlayerInput>,
+    )>,
+) {
+    for (mut velocity, mut state, input) in players {
+        match &mut state.movement_state {
+            MajorMoveState::Grounded(_) => {}
+            MajorMoveState::Airborne(substate) => match substate {
+                MinorAirborneState::Dive => {}
+                _ => {
+                    if input.just_pressed(&PlayerInput::Crouch) && state.can_dive {
+                        if let Ok(_) =
+                            state.transition(MajorMoveState::Airborne(MinorAirborneState::Dive))
+                        {
+                            velocity.y = 1.0;
+                            state.can_dive = false;
+                        }
+                    }
+                }
+            },
+        }
+    }
+}
+
+fn player_glide(
+    players: Query<(
+        &LinearVelocity,
+        &mut StateMachine,
+        &ActionState<PlayerInput>,
+    )>,
+) {
+    for (velocity, mut state, input) in players {
+        match &mut state.movement_state {
+            MajorMoveState::Grounded(_) => {}
+            MajorMoveState::Airborne(substance) => match substance {
+                MinorAirborneState::Dive => {}
+                MinorAirborneState::Glide => {
+                    if !input.pressed(&PlayerInput::Jump) {
+                        let _ =
+                            state.transition(MajorMoveState::Airborne(MinorAirborneState::Falling));
+                    }
+                }
+                _ => {
+                    if velocity.y <= 0.0 && input.pressed(&PlayerInput::Jump) {
+                        let _ =
+                            state.transition(MajorMoveState::Airborne(MinorAirborneState::Glide));
+                    }
+                }
+            },
         }
     }
 }

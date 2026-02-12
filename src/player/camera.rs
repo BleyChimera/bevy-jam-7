@@ -11,17 +11,21 @@ impl Plugin for CameraPlugin {
         app.register_type::<CameraPivot>();
 
         app.add_systems(
-            Update,
+            FixedUpdate,
             (
-                (rotate_camera_manual, rotate_camera_auto, move_camera),
-                (update_camera_direction, unstuck_camera),
+                (rotate_camera_manual, rotate_camera_auto),
+                move_camera, unstuck_camera,
+                (update_camera_direction,),
             )
                 .chain(),
         );
+
+        //app.add_systems(FixedUpdate, (move_camera, unstuck_camera).chain());
     }
 }
 
 #[derive(Component, Reflect, Clone, Copy)]
+#[require(TransformInterpolation,)]
 #[reflect(Component)]
 pub struct CameraPivot(pub Entity);
 
@@ -81,9 +85,9 @@ fn rotate_camera_auto(
 
         let mut angle_diff = point_direction.angle_to(flat_dir);
 
-        let factor = 1.0 - (angle_diff / (std::f32::consts::PI / 2.0)).abs();
+        let factor = (angle_diff / (std::f32::consts::PI)).abs();
 
-        if angle_diff.abs() >= (std::f32::consts::PI / 2.0) - 0.01 {
+        if angle_diff.abs() >= (std::f32::consts::PI) - 0.01 {
             angle_diff = 0.0;
         }
 
@@ -105,9 +109,9 @@ fn update_camera_direction(
 }
 
 const PREDICTED_TIME: f32 = 0.05;
-const SPEED_CAMERA: f32 = 9.0;
+const SPEED_CAMERA: f32 = 1.0;
 fn move_camera(
-    query: Query<(&mut Transform, &CameraPivot), Without<PlayerCharacterMarker>>,
+    query: Query<(&mut Transform, &CameraPivot), (Without<PlayerCharacterMarker>, Without<Collider>)>,
     mut players: Query<(&Transform, &LinearVelocity), With<PlayerCharacterMarker>>,
     time: Res<Time>,
     spatial_query: SpatialQuery,
@@ -127,20 +131,28 @@ fn move_camera(
             &SpatialQueryFilter::from_excluded_entities([pivot.0]),
         );
 
-        let target_point = if let Some(cast) = cast {
+        let mut target_point = if let Some(cast) = cast {
             top_of_player + velocity.0.normalize_or_zero() * cast.distance
         } else {
             top_of_player + velocity.0 * PREDICTED_TIME
         };
+        
+        if (target_point - top_of_player).length() > 1.0 {
+            target_point = top_of_player + velocity.0.normalize_or_zero();
+        }
+        
+        if target_point.y < player_transform.translation.y {
+            target_point.y = player_transform.translation.y;
+        }
 
         transform.translation = transform.translation.move_towards(
             target_point,
-            time.delta_secs() * (transform.translation - target_point).length() * SPEED_CAMERA,
+            time.delta_secs() * (velocity.length() + SPEED_CAMERA),
         );
     }
 }
 
-const CAMERA_DISTANCE: f32 = 3.0;
+const CAMERA_DISTANCE: f32 = 5.0;
 fn unstuck_camera(
     pivots: Query<(&Transform, &CameraPivot)>,
     cameras: Query<(&mut Transform, &ChildOf), Without<CameraPivot>>,

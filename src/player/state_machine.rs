@@ -12,7 +12,8 @@ impl Plugin for StateMachinePlugin {
 pub struct StateMachine {
     pub movement_state: MajorMoveState,
     coyote_timer: f32,
-    stuck_in_state_timer: f32,
+    pub stuck_in_state_timer: f32,
+    pub can_dive: bool,
 }
 
 #[derive(Reflect, Clone)]
@@ -89,7 +90,7 @@ pub struct MovementStats {
 
 const MAX_JUMP_LENGTH: f32 = 0.2;
 const MAX_CROUCH_JUMP_LENGTH: f32 = 0.3;
-const MAX_DIVE_JUMP_LENGTH: f32 = 0.0;
+const MAX_DIVE_JUMP_LENGTH: f32 = 0.1;
 
 impl PlayerStateMachine for StateMachine {
     fn jump(&mut self) -> Result<MajorMoveState, MajorMoveState> {
@@ -143,7 +144,10 @@ impl PlayerStateMachine for StateMachine {
         self.stuck_in_state_timer = self.stuck_in_state_timer.max(0.0);
 
         match self.movement_state {
-            MajorMoveState::Grounded(_) => self.coyote_timer = 0.25,
+            MajorMoveState::Grounded(_) => {
+                self.coyote_timer = 0.25;
+                self.can_dive = true;
+            }
             MajorMoveState::Airborne(_) => {}
         }
     }
@@ -239,7 +243,7 @@ impl PlayerStateMachine for StateMachine {
                 }
                 MinorAirborneState::Falling => return (15.0, 25.0, 20.0),
                 MinorAirborneState::Glide => return (1.0, 1.0, 5.0),
-                MinorAirborneState::Dive => return (40.0, 160.0, 40.0),
+                MinorAirborneState::Dive => return (4.0, 160.0, 80.0),
             },
         }
     }
@@ -250,7 +254,7 @@ impl PlayerStateMachine for StateMachine {
                 MinorAirborneState::Jumping(jump_type) => match jump_type {
                     JumpType::Normal(_) => return 5.0,
                     JumpType::Crouch(_) => return 7.0,
-                    JumpType::Dive(_) => return 1.0,
+                    JumpType::Dive(_) => return 7.0,
                 },
                 _ => {}
             },

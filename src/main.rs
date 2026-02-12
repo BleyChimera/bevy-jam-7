@@ -24,7 +24,7 @@ fn main() {
         bevy_skein::SkeinPlugin::default(),
         PhysicsPlugins::new(FixedUpdate),
         PhysicsDebugPlugin::default(),
-        //bevy_seedling::SeedlingPlugin::default(),
+        bevy_seedling::SeedlingPlugin::default(),
         input::InputPlugin,
         player::PlayerPlugin,
         character_body::CharacterBodyPlugin,
