@@ -210,14 +210,14 @@ impl PlayerStateMachine for StateMachine {
                     return MovementStats {
                         max_speed: 10.0,
                         acceleration: 10.0,
-                        rotation_rate: 0.0,
+                        rotation_rate: 10.0,
                     };
                 }
                 MinorAirborneState::Glide => {
                     return MovementStats {
                         max_speed: 5.0,
                         acceleration: 10.0,
-                        rotation_rate: 0.0,
+                        rotation_rate: 10.0,
                     };
                 }
                 MinorAirborneState::Dive => {

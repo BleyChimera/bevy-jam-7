@@ -30,11 +30,12 @@ fn main() {
         character_body::CharacterBodyPlugin,
     ));
 
-    app.add_systems(Startup, (test_setup,));
+    app.add_systems(Startup, (test_setup, change_debug_phys_config));
 
     app.add_systems(
         Update,
         (
+            swap_mouse_state,
             load_animations_from_gltf,
             get_animation_target,
             test_animation,
@@ -42,6 +43,29 @@ fn main() {
     );
 
     app.run();
+}
+
+fn change_debug_phys_config(mut gizmo_conf: ResMut<GizmoConfigStore>) {
+    let (gizmo_config, physics_gizmos) = gizmo_conf.config_mut::<PhysicsGizmos>();
+
+    physics_gizmos.collider_color = Some(bevy::color::palettes::basic::GREEN.into());
+    gizmo_config.line.style = GizmoLineStyle::Dotted;
+    gizmo_config.line.width = 2.5;
+}
+
+fn swap_mouse_state(
+    mut window: Single<&mut bevy::window::CursorOptions, With<bevy::window::PrimaryWindow>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+) {
+    if buttons.just_pressed(MouseButton::Left) {
+        if window.grab_mode !=  bevy::window::CursorGrabMode::Locked {
+            window.visible = false;
+            window.grab_mode = bevy::window::CursorGrabMode::Locked;
+        } else {
+            window.visible = true;
+            window.grab_mode = bevy::window::CursorGrabMode::None;
+        }
+    }
 }
 
 fn test_setup(

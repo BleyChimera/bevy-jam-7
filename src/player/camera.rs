@@ -14,7 +14,8 @@ impl Plugin for CameraPlugin {
             FixedUpdate,
             (
                 (rotate_camera_manual, rotate_camera_auto),
-                move_camera, unstuck_camera,
+                move_camera,
+                unstuck_camera,
                 (update_camera_direction,),
             )
                 .chain(),
@@ -25,7 +26,7 @@ impl Plugin for CameraPlugin {
 }
 
 #[derive(Component, Reflect, Clone, Copy)]
-#[require(TransformInterpolation,)]
+#[require(TransformInterpolation)]
 #[reflect(Component)]
 pub struct CameraPivot(pub Entity);
 
@@ -111,7 +112,10 @@ fn update_camera_direction(
 const PREDICTED_TIME: f32 = 0.05;
 const SPEED_CAMERA: f32 = 1.0;
 fn move_camera(
-    query: Query<(&mut Transform, &CameraPivot), (Without<PlayerCharacterMarker>, Without<Collider>)>,
+    query: Query<
+        (&mut Transform, &CameraPivot),
+        (Without<PlayerCharacterMarker>, Without<Collider>),
+    >,
     mut players: Query<(&Transform, &LinearVelocity), With<PlayerCharacterMarker>>,
     time: Res<Time>,
     spatial_query: SpatialQuery,
@@ -136,11 +140,11 @@ fn move_camera(
         } else {
             top_of_player + velocity.0 * PREDICTED_TIME
         };
-        
+
         if (target_point - top_of_player).length() > 1.0 {
             target_point = top_of_player + velocity.0.normalize_or_zero();
         }
-        
+
         if target_point.y < player_transform.translation.y {
             target_point.y = player_transform.translation.y;
         }
