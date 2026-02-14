@@ -15,7 +15,8 @@ fn main() {
     app.insert_resource(Time::from_hz(60.0));
 
     app.register_type::<MiserereAnimationTarget>()
-        .register_type::<MiserereAnimationsConnector>();
+        .register_type::<MiserereAnimationsConnector>()
+        .register_type::<ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>();
 
     app.add_plugins((
         DefaultPlugins,
@@ -41,12 +42,16 @@ fn main() {
             test_animation,
         ),
     );
+    
+    app.add_observer(switcheroo);
 
     app.run();
 }
 
-fn change_debug_phys_config(mut gizmo_conf: ResMut<GizmoConfigStore>) {
-    let (gizmo_config, physics_gizmos) = gizmo_conf.config_mut::<PhysicsGizmos>();
+fn change_debug_phys_config(mut gizmo_config: ResMut<GizmoConfigStore>) {
+    let (gizmo_config, physics_gizmos) = gizmo_config.config_mut::<PhysicsGizmos>();
+    
+    gizmo_config.enabled = false;
 
     physics_gizmos.collider_color = Some(bevy::color::palettes::basic::GREEN.into());
     gizmo_config.line.style = GizmoLineStyle::Dotted;
@@ -58,7 +63,7 @@ fn swap_mouse_state(
     buttons: Res<ButtonInput<MouseButton>>,
 ) {
     if buttons.just_pressed(MouseButton::Left) {
-        if window.grab_mode !=  bevy::window::CursorGrabMode::Locked {
+        if window.grab_mode != bevy::window::CursorGrabMode::Locked {
             window.visible = false;
             window.grab_mode = bevy::window::CursorGrabMode::Locked;
         } else {
@@ -74,10 +79,10 @@ fn test_setup(
     mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
     commands.spawn(SceneRoot(
-        asset_server.load(GltfAssetLabel::Scene(0).from_asset("test_level.glb")),
+        asset_server.load(GltfAssetLabel::Scene(0).from_asset("main_level.glb")),
     ));
 
-    let player_cam_transform = Transform::from_xyz(0.0, 10.5, 0.0);
+    let player_cam_transform = Transform::from_xyz(0.0, 5.5, 0.0);
 
     let player = commands
         .spawn((
@@ -95,7 +100,16 @@ fn test_setup(
     commands.spawn((
         player::camera::CameraPivot(player),
         player_cam_transform,
-        children![(Camera3d::default(), Transform::from_xyz(0.0, 0.0, 10.0))],
+        children![(
+            Camera3d::default(),
+            Transform::from_xyz(0.0, 0.0, 10.0),
+            bevy::core_pipeline::tonemapping::Tonemapping::AgX,
+            bevy::post_process::bloom::Bloom::default(),
+            bevy::light::VolumetricFog {
+                ambient_intensity: 0.0,
+                ..default()
+            },
+        )],
     ));
 
     commands.insert_resource(MiserereModel {
@@ -231,7 +245,7 @@ fn test_animation(
                                 .unwrap()
                                 .clone(),
                         )
-                        .set_weight(1.0 - ratio)
+                        .set_weight((1.0 - ratio).clamp(0.0, 1.0))
                         .repeat();
                     animation
                         .play(
@@ -241,7 +255,7 @@ fn test_animation(
                                 .unwrap()
                                 .clone(),
                         )
-                        .set_weight(ratio)
+                        .set_weight(ratio.clamp(0.0, 1.0))
                         .repeat();
                 }
                 player::state_machine::MinorGroundState::Sliding => {
@@ -444,4 +458,12 @@ fn test_animation(
             },
         }
     }
+}
+
+#[derive(Component, Reflect, Debug)]
+#[reflect(Component)]
+struct ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem;
+
+fn switcheroo(trigger: On<Add, ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>, mut commands: Commands) {
+    commands.entity(trigger.entity).remove::<ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>().insert(ColliderConstructor::TrimeshFromMeshWithConfig(TrimeshFlags::FIX_INTERNAL_EDGES));
 }
