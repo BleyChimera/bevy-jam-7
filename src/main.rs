@@ -42,7 +42,7 @@ fn main() {
             test_animation,
         ),
     );
-    
+
     app.add_observer(switcheroo);
 
     app.run();
@@ -50,7 +50,7 @@ fn main() {
 
 fn change_debug_phys_config(mut gizmo_config: ResMut<GizmoConfigStore>) {
     let (gizmo_config, physics_gizmos) = gizmo_config.config_mut::<PhysicsGizmos>();
-    
+
     gizmo_config.enabled = false;
 
     physics_gizmos.collider_color = Some(bevy::color::palettes::basic::GREEN.into());
@@ -90,10 +90,20 @@ fn test_setup(
             player::PlayerCharacterMarker,
             input::PlayerInput::default_input_map(),
             player_cam_transform.clone(),
-            children![(
-                MiserereSceneTarget,
-                Transform::from_xyz(0.0, -0.5, 0.0) //SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(MISERERE_PATH))),
-            )],
+            children![
+                (
+                    MiserereSceneTarget,
+                    Transform::from_xyz(0.0, -0.5, 0.0) //SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(MISERERE_PATH))),
+                ),
+                (
+                    bevy::light::FogVolume {
+                        absorption: 0.2,
+                        ..Default::default()
+                    },
+                    Transform::from_scale(Vec3::splat(35.0))
+                        .with_translation(Vec3::new(0.0, 0.0, 0.0))
+                )
+            ],
         ))
         .id();
 
@@ -464,6 +474,14 @@ fn test_animation(
 #[reflect(Component)]
 struct ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem;
 
-fn switcheroo(trigger: On<Add, ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>, mut commands: Commands) {
-    commands.entity(trigger.entity).remove::<ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>().insert(ColliderConstructor::TrimeshFromMeshWithConfig(TrimeshFlags::FIX_INTERNAL_EDGES));
+fn switcheroo(
+    trigger: On<Add, ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>,
+    mut commands: Commands,
+) {
+    commands
+        .entity(trigger.entity)
+        .remove::<ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>()
+        .insert(ColliderConstructor::TrimeshFromMeshWithConfig(
+            TrimeshFlags::FIX_INTERNAL_EDGES,
+        ));
 }
