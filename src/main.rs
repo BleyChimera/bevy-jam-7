@@ -129,11 +129,12 @@ fn test_setup(
             DistanceFog {
                 falloff: FogFalloff::Linear {
                     start: 25.0,
-                    end: 150.0
+                    end: 1500.0
                 },
                 color: bevy::color::palettes::basic::BLACK.into(),
                 ..default()
             },
+            SpotLight::default(),
             //bevy::post_process::auto_exposure::AutoExposure::default(),
             /*children![(
                 Name::new("Fog"),
