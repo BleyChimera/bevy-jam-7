@@ -8,6 +8,8 @@ mod input;
 mod player;
 
 const MISERERE_PATH: &str = "miserere.glb";
+const TEST_MAP: &str = "test_level.glb";
+const MAIN_MAP: &str = "main_level.glb";
 
 fn main() {
     let mut app = App::new();
@@ -45,6 +47,10 @@ fn main() {
 
     app.add_observer(switcheroo);
 
+    app.add_observer(enable_shadows_spot);
+    app.add_observer(enable_shadows_point);
+    app.add_observer(enable_shadows_dir);
+
     app.run();
 }
 
@@ -79,7 +85,7 @@ fn test_setup(
     mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
     commands.spawn(SceneRoot(
-        asset_server.load(GltfAssetLabel::Scene(0).from_asset("main_level.glb")),
+        asset_server.load(GltfAssetLabel::Scene(0).from_asset(MAIN_MAP)),
     ));
 
     let player_cam_transform = Transform::from_xyz(0.0, 5.5, 0.0);
@@ -92,17 +98,17 @@ fn test_setup(
             player_cam_transform.clone(),
             children![
                 (
+                    Name::new("Miserere model"),
                     MiserereSceneTarget,
                     Transform::from_xyz(0.0, -0.5, 0.0) //SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset(MISERERE_PATH))),
                 ),
-                (
+                /*(
+                    Name::new("Fog"),
                     bevy::light::FogVolume {
-                        absorption: 0.5,
                         ..Default::default()
                     },
-                    Transform::from_scale(Vec3::splat(35.0))
-                        .with_translation(Vec3::new(0.0, 0.0, 0.0))
-                )
+                    Transform::from_scale(Vec3::splat(10.0))
+                )*/
             ],
         ))
         .id();
@@ -115,15 +121,27 @@ fn test_setup(
             Transform::from_xyz(0.0, 0.0, 10.0),
             bevy::core_pipeline::tonemapping::Tonemapping::AgX,
             bevy::post_process::bloom::Bloom::default(),
-            bevy::light::VolumetricFog {
+            /*bevy::light::VolumetricFog {
                 ambient_intensity: 0.0,
+                step_count: 64*2,
                 ..default()
-            },
+            },*/
             DistanceFog {
-                falloff: FogFalloff::Linear { start: 25.0, end: 200.0 },
+                falloff: FogFalloff::Linear {
+                    start: 25.0,
+                    end: 150.0
+                },
                 color: bevy::color::palettes::basic::BLACK.into(),
                 ..default()
-            }
+            },
+            //bevy::post_process::auto_exposure::AutoExposure::default(),
+            /*children![(
+                Name::new("Fog"),
+                bevy::light::FogVolume {
+                    ..Default::default()
+                },
+                Transform::from_scale(Vec3::splat(100.0)).with_translation(Vec3::NEG_Z * 40.0),
+            ),],*/
         )],
     ));
 
@@ -207,6 +225,24 @@ fn get_animation_target(
             commands.entity(player.0).remove::<MiserereSceneTarget>();
         }
     }
+}
+
+fn enable_shadows_spot(trigger: On<Add, SpotLight>, mut lights: Query<&mut SpotLight>) {
+    let mut light = lights.get_mut(trigger.entity).unwrap();
+    light.shadows_enabled = true;
+}
+
+fn enable_shadows_dir(
+    trigger: On<Add, DirectionalLight>,
+    mut lights: Query<&mut DirectionalLight>,
+) {
+    let mut light = lights.get_mut(trigger.entity).unwrap();
+    light.shadows_enabled = true;
+}
+
+fn enable_shadows_point(trigger: On<Add, PointLight>, mut lights: Query<&mut PointLight>) {
+    let mut light = lights.get_mut(trigger.entity).unwrap();
+    light.shadows_enabled = true;
 }
 
 // TODO: MOVE ANIMATION RELATED THINGS TO PLAYER MODULE

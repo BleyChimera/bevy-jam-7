@@ -88,7 +88,7 @@ fn rotate_camera_auto(
 
         let factor = (angle_diff / (std::f32::consts::PI)).abs();
 
-        if angle_diff.abs() >= (std::f32::consts::PI) - 0.01 {
+        if angle_diff.abs() >= (std::f32::consts::PI) - 50.0_f32.to_radians() {
             angle_diff = 0.0;
         }
 
