@@ -97,7 +97,7 @@ fn test_setup(
                 ),
                 (
                     bevy::light::FogVolume {
-                        absorption: 0.2,
+                        absorption: 0.5,
                         ..Default::default()
                     },
                     Transform::from_scale(Vec3::splat(35.0))
@@ -119,6 +119,11 @@ fn test_setup(
                 ambient_intensity: 0.0,
                 ..default()
             },
+            DistanceFog {
+                falloff: FogFalloff::Linear { start: 25.0, end: 200.0 },
+                color: bevy::color::palettes::basic::BLACK.into(),
+                ..default()
+            }
         )],
     ));
 
