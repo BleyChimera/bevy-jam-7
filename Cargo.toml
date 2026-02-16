@@ -7,7 +7,6 @@ edition = "2024"
 avian3d = { git = "https://github.com/avianphysics/avian", rev = "4e0c808823b6d6d2b347dd2fc743c97966e9dc26" }
 bevy = { version = "0.18" }
 bevy-inspector-egui = "0.36.0"
-bevy_seedling = "0.7.0"
 bevy_skein = "0.5.0"
 leafwing-input-manager = "0.20.0"
 # Set max log levels. This helps avoid unwanted low-severity log spam, which can affect performance.

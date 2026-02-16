@@ -16,9 +16,16 @@ fn main() {
 
     app.insert_resource(Time::from_hz(60.0));
 
+    app.insert_resource(RunTimer {
+        time: 0.0,
+        finished: false,
+    });
+
     app.register_type::<MiserereAnimationTarget>()
         .register_type::<MiserereAnimationsConnector>()
-        .register_type::<ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>();
+        .register_type::<ColliderContructorWithFlagsBecauseSkeinDoesntSupportThem>()
+        .register_type::<WinCondition>()
+        .register_type::<TimerMarker>();
 
     app.add_plugins((
         DefaultPlugins,
@@ -27,13 +34,14 @@ fn main() {
         bevy_skein::SkeinPlugin::default(),
         PhysicsPlugins::new(FixedUpdate),
         PhysicsDebugPlugin::default(),
-        bevy_seedling::SeedlingPlugin::default(),
         input::InputPlugin,
         player::PlayerPlugin,
         character_body::CharacterBodyPlugin,
     ));
 
-    app.add_systems(Startup, (test_setup, change_debug_phys_config));
+    app.add_systems(Startup, (main_setup, change_debug_phys_config));
+
+    app.add_systems(FixedUpdate, (tick_game, reset_if_lost));
 
     app.add_systems(
         Update,
@@ -42,6 +50,7 @@ fn main() {
             load_animations_from_gltf,
             get_animation_target,
             test_animation,
+            update_ui,
         ),
     );
 
@@ -52,6 +61,12 @@ fn main() {
     app.add_observer(enable_shadows_dir);
 
     app.run();
+}
+
+fn tick_game(mut run_timer: ResMut<RunTimer>, time: Res<Time>) {
+    if !run_timer.finished {
+        run_timer.time += time.delta_secs();
+    }
 }
 
 fn change_debug_phys_config(mut gizmo_config: ResMut<GizmoConfigStore>) {
@@ -79,7 +94,47 @@ fn swap_mouse_state(
     }
 }
 
-fn test_setup(
+fn update_ui(query: Query<&mut Text, With<TimerMarker>>, run_timer: Res<RunTimer>) {
+    for mut text in query {
+        let new_text = format!("Run timer: {} seconds", run_timer.time);
+        text.0 = new_text;
+    }
+}
+
+#[derive(Debug, Reflect, Component)]
+#[reflect(Component)]
+struct TimerMarker;
+
+fn reset_if_lost(
+    query: Query<
+        &mut Transform,
+        (
+            With<player::PlayerMarker>,
+            Without<player::camera::CameraPivot>,
+        ),
+    >,
+    mut query2: Query<
+        &mut Transform,
+        (
+            With<player::camera::CameraPivot>,
+            Without<player::PlayerMarker>,
+        ),
+    >,
+    mut run_timer: ResMut<RunTimer>,
+) {
+    for mut player in query {
+        if player.translation.y < -1579.36 {
+            player.translation = Vec3::new(0.0, 5.5, 0.0);
+            run_timer.time = 0.0;
+            run_timer.finished = false;
+            for mut cam in &mut query2 {
+                cam.translation = Vec3::new(0.0, 5.5, 0.0);
+            }
+        }
+    }
+}
+
+fn main_setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut graphs: ResMut<Assets<AnimationGraph>>,
@@ -87,6 +142,8 @@ fn test_setup(
     commands.spawn(SceneRoot(
         asset_server.load(GltfAssetLabel::Scene(0).from_asset(MAIN_MAP)),
     ));
+
+    commands.spawn((Text::new("Technically UI"), TimerMarker));
 
     let player_cam_transform = Transform::from_xyz(0.0, 5.5, 0.0);
 
@@ -154,6 +211,16 @@ fn test_setup(
 }
 
 #[derive(Resource)]
+pub struct RunTimer {
+    time: f32,
+    finished: bool,
+}
+
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+struct WinCondition;
+
+#[derive(Resource)]
 pub struct MiserereModel {
     gltf_handle: Handle<Gltf>,
     animation_handle: Handle<AnimationGraph>,
@@ -178,10 +245,30 @@ fn load_animations_from_gltf(
     mut player_model: ResMut<MiserereModel>,
     gltfs: Res<Assets<Gltf>>,
     mut graphs: ResMut<Assets<AnimationGraph>>,
+
+    mut player_tf: Single<
+        &mut Transform,
+        (
+            With<player::PlayerMarker>,
+            Without<player::camera::CameraPivot>,
+        ),
+    >,
+    mut player_camera_tf: Single<
+        &mut Transform,
+        (
+            With<player::camera::CameraPivot>,
+            Without<player::PlayerMarker>,
+        ),
+    >,
+    mut run_timer: ResMut<RunTimer>,
 ) {
     for event in gltf.read() {
         match event {
             AssetEvent::Added { id } | AssetEvent::LoadedWithDependencies { id } => {
+                player_tf.translation = Vec3::new(0.0, 5.5, 0.0);
+                player_camera_tf.translation = Vec3::new(0.0, 5.5, 0.0);
+                run_timer.time = 0.0;
+
                 if player_model.gltf_handle.id() == *id {
                     let miserere = gltfs.get(*id).unwrap();
                     for entity in scene_instantiate {

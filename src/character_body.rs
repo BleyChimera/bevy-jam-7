@@ -53,6 +53,8 @@ fn character_body_movement(
         Option<&CharacterGroundSnap>,
     )>,
     force_slide: Query<&ForceSlide>,
+    finish_line: Query<&crate::WinCondition>,
+    mut timer: ResMut<crate::RunTimer>,
     time: Res<Time>,
 ) {
     for (entity, mut body, collider, mut transform, mut velocity, snap) in bodies.into_iter() {
@@ -82,6 +84,10 @@ fn character_body_movement(
 
                 if force_slide.get(result.entity).is_ok() {
                     body.force_slide = true;
+                }
+
+                if finish_line.get(result.entity).is_ok() {
+                    timer.finished = true;
                 }
 
                 MoveAndSlideHitResponse::Accept
