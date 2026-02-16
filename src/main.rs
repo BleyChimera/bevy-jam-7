@@ -29,8 +29,8 @@ fn main() {
 
     app.add_plugins((
         DefaultPlugins,
-        bevy_inspector_egui::bevy_egui::EguiPlugin::default(),
-        bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+        //bevy_inspector_egui::bevy_egui::EguiPlugin::default(),
+        //bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
         bevy_skein::SkeinPlugin::default(),
         PhysicsPlugins::new(FixedUpdate),
         PhysicsDebugPlugin::default(),
